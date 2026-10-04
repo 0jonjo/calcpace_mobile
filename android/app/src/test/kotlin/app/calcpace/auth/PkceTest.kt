@@ -6,13 +6,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PkceTest {
-    // The same pair calcpace_web's tests use, so both sides agree on the
-    // encoding (base64url, no padding, SHA-256 of the ASCII verifier).
     @Test
-    fun challengeMatchesTheSiteVector() {
+    fun challengeMatchesRfc7636AppendixB() {
         assertEquals(
-            "P-rITZl1iFA1jnXaCQF2ExWGIXpzhiTyDvxPa8SWOrI",
-            Pkce.challengeFor("dBjftJeZ4CVP-mJ92K9A2PSWnAZ8YYbC6MnS8Yq6pR8")
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+            Pkce.challengeFor("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk")
         )
     }
 

@@ -19,7 +19,7 @@ HTML pages (Turbo)          ───────▶  WebFragment (Hotwire WebVi
 
 - **Server-driven:** a screen changes with a Rails deploy, without a new store release.
 - **Edge-cache safe:** Cloudflare caches the public pages and doesn't vary by user agent, so the site detects the app on the client, from the user agent's `Hotwire Native` marker.
-- **Sign-in:** Google refuses OAuth inside WebViews, so Google and Strava sign-in run in a Chrome Custom Tab and come back through `calcpace://auth?ticket=…`. The ticket is single-use, lasts two minutes and only works with a PKCE verifier that never leaves the app. See [`AppAuth.kt`](android/app/src/main/kotlin/app/calcpace/auth/AppAuth.kt).
+- **Sign-in:** Google refuses OAuth inside WebViews, so Google and Strava sign-in run in a Chrome Custom Tab and come back through `https://calcpace.app/app_auth/callback?ticket=…`, a verified App Link that only the Play-signed app receives. The ticket is single-use, lasts two minutes and only works with a PKCE verifier that never leaves the app. Links from outside can't load `/app_auth/redeem` into the WebView. See [`AppAuth.kt`](android/app/src/main/kotlin/app/calcpace/auth/AppAuth.kt) and [`IncomingLink.kt`](android/app/src/main/kotlin/app/calcpace/main/IncomingLink.kt).
 
 ## Android
 

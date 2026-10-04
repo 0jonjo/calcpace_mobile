@@ -12,7 +12,7 @@
     {
       "patterns": ["^$", "^/$", "^/[a-z]{2}(-[A-Z]{2})?/?$"],
       "properties": {
-        "presentation": "clear_all"
+        "presentation": "replace_root"
       }
     },
     {

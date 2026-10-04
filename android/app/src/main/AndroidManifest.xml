@@ -27,8 +27,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- calcpace.app links open in the app, as they did in the TWA.
-                 Verified by /.well-known/assetlinks.json on the site. -->
+            <!-- calcpace.app links open in the app, as they did in the TWA,
+                 verified by /.well-known/assetlinks.json on the site. This is
+                 also how a sign-in comes back from the browser tab
+                 (/app_auth/callback): only this signed app receives it.
+                 IncomingLink decides what each path may do. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -36,14 +39,6 @@
                 <data android:scheme="https" android:host="calcpace.app" />
             </intent-filter>
 
-            <!-- Where the site hands a finished Google/Strava sign-in back
-                 from the browser tab. See AppAuth. -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="calcpace" android:host="auth" />
-            </intent-filter>
         </activity>
     </application>
 </manifest>
