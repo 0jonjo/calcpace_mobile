@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.fragment.app.Fragment
 import app.calcpace.BuildConfig
 import com.google.firebase.FirebaseApp
@@ -60,10 +61,10 @@ object Push {
     }
 
     /** The athlete tapped "turn on". */
-    fun optIn(context: Context) = prefs(context).edit().putBoolean(KEY_OPTED_IN, true).apply()
+    fun optIn(context: Context) = prefs(context).edit { putBoolean(KEY_OPTED_IN, true) }
 
     /** The system prompt is about to show. */
-    fun markAsked(context: Context) = prefs(context).edit().putBoolean(KEY_ASKED, true).apply()
+    fun markAsked(context: Context) = prefs(context).edit { putBoolean(KEY_ASKED, true) }
 
     fun isPermissionGranted(context: Context): Boolean =
         Build.VERSION.SDK_INT < PushStatus.RUNTIME_PERMISSION_SDK ||
