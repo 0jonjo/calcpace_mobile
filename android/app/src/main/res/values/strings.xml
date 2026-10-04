@@ -8,8 +8,9 @@
 
     <!-- Asked before linking Health Connect when its permissions were
          granted before, so no Health Connect screen shows: a page can't
-         link this phone to an account without the athlete saying so. In
-         pt-BR the system calls Health Connect "Conexão Saúde". -->
+         link this phone to an account without the athlete saying so. The
+         system calls Health Connect "Conexão Saúde" in pt-BR,
+         "ヘルスコネクト" in ja and "헬스 커넥트" in ko. -->
     <string name="hc_link_confirm_title">Import runs from Health Connect?</string>
     <string name="hc_link_confirm_body">Calcpace will read your runs and walks from Health Connect and add them to the account you are signed in to.</string>
     <string name="hc_link_confirm_ok">Import</string>

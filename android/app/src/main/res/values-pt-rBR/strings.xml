@@ -3,6 +3,6 @@
     <string name="channel_runs_name">Corridas</string>
     <string name="channel_runs_description">Quando sua corrida chega no Calcpace</string>
     <string name="hc_link_confirm_title">Importar corridas da Conexão Saúde?</string>
-    <string name="hc_link_confirm_body">O Calcpace vai ler suas corridas e caminhadas da Conexão Saúde e adicionar à conta em que você entrou.</string>
+    <string name="hc_link_confirm_body">O Calcpace vai ler suas corridas e caminhadas da Conexão Saúde e adicioná-las à conta em que você entrou.</string>
     <string name="hc_link_confirm_ok">Importar</string>
 </resources>
