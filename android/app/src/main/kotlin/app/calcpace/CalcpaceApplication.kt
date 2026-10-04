@@ -2,11 +2,16 @@ package app.calcpace
 
 import android.app.Application
 import app.calcpace.auth.AppAuthRouteDecisionHandler
+import app.calcpace.push.Push
+import app.calcpace.push.PushComponent
 import app.calcpace.web.WebFragment
+import dev.hotwire.core.bridge.BridgeComponentFactory
+import dev.hotwire.core.bridge.KotlinXJsonConverter
 import dev.hotwire.core.config.Hotwire
 import dev.hotwire.core.logging.HotwireLogLevel
 import dev.hotwire.core.turbo.config.PathConfiguration
 import dev.hotwire.navigation.config.defaultFragmentDestination
+import dev.hotwire.navigation.config.registerBridgeComponents
 import dev.hotwire.navigation.config.registerFragmentDestinations
 import dev.hotwire.navigation.config.registerRouteDecisionHandlers
 import dev.hotwire.navigation.routing.AppNavigationRouteDecisionHandler
@@ -16,6 +21,7 @@ import dev.hotwire.navigation.routing.SystemNavigationRouteDecisionHandler
 class CalcpaceApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        Push.init(this)
         configureHotwire()
     }
 
@@ -31,6 +37,14 @@ class CalcpaceApplication : Application() {
             AppNavigationRouteDecisionHandler(),
             BrowserTabRouteDecisionHandler(),
             SystemNavigationRouteDecisionHandler()
+        )
+
+        // Native pieces the site can drive. "push" asks for notifications
+        // from the home page's card. The page's user agent lists them, so the
+        // site only talks to components this build has.
+        Hotwire.config.jsonConverter = KotlinXJsonConverter()
+        Hotwire.registerBridgeComponents(
+            BridgeComponentFactory("push", ::PushComponent)
         )
 
         // The site looks for "Hotwire Native" in the user agent to know it is

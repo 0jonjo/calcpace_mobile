@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_runs_name">ランニング</string>
+    <string name="channel_runs_description">ランニングが Calcpace に届いたとき</string>
+</resources>

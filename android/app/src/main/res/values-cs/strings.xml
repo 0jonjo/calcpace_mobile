@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_runs_name">Běhy</string>
+    <string name="channel_runs_description">Když váš běh dorazí do Calcpace</string>
+</resources>

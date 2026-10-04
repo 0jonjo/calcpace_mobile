@@ -1,3 +1,8 @@
 <resources>
-    <string name="app_name">Calcpace</string>
+    <string name="app_name" translatable="false">Calcpace</string>
+
+    <!-- The notification channel for "your run is in", as the phone's
+         settings list it. "Run" is any run, not a race. -->
+    <string name="channel_runs_name">Runs</string>
+    <string name="channel_runs_description">When your run arrives in Calcpace</string>
 </resources>

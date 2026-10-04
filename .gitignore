@@ -11,6 +11,12 @@ captures/
 *.jks
 signing.properties
 
+# Firebase config lives outside the repo (see README); never commit it
+google-services.json
+
+# Kotlin compiler caches
+.kotlin/
+
 # IDEs and OS
 .idea/
 *.iml

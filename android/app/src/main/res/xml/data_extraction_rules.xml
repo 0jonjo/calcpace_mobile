@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Push state and the signed-in session belong to this
+     install on this phone: an FCM token, an opt-in or a session cookie
+     carried to a new phone (or restored after a reinstall) would point at
+     the wrong device, skip the athlete's own choice, or share a session. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="push.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
+        <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+        <!-- The WebView's cookies (app_webview/Default/Cookies) and storage:
+             a copied session cookie would leave two phones on one session,
+             each push registration evicting the other's token, and a sign-out
+             on one ending both. The new phone signs in again instead. -->
+        <exclude domain="root" path="app_webview" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="push.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
+        <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+        <!-- The WebView's cookies (app_webview/Default/Cookies) and storage:
+             a copied session cookie would leave two phones on one session,
+             each push registration evicting the other's token, and a sign-out
+             on one ending both. The new phone signs in again instead. -->
+        <exclude domain="root" path="app_webview" />
+    </device-transfer>
+</data-extraction-rules>

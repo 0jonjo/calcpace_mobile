@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_runs_name">Runs</string>
+    <string name="channel_runs_description">Wanneer je run in Calcpace binnenkomt</string>
+</resources>
