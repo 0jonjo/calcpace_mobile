@@ -19,23 +19,38 @@ import app.calcpace.Calcpace
  *    [AppAuthRouteDecisionHandler] catches it and calls [begin].
  * 2. [begin] keeps a fresh verifier and opens
  *    /app_auth/start?provider=…&challenge=… in a Custom Tab.
- * 3. After the provider, the site redirects the tab to
- *    calcpace://auth?ticket=…, which Android delivers to MainActivity.
- * 4. [redeemLocation] spends the verifier once and points the WebView at
- *    /app_auth/redeem, which signs the WebView in.
+ * 3. After the provider, the site sends the tab to
+ *    https://calcpace.app/app_auth/callback?ticket=…, a verified App Link
+ *    that only this signed app receives.
+ * 4. [redeemLocation] points the WebView at /app_auth/redeem with the
+ *    ticket and the verifier, which signs the WebView in.
  *
- * Any app can claim the calcpace:// scheme and read a ticket; none of them
- * holds the verifier, and the site redeems a ticket only with it.
+ * The ticket is bound to the challenge; only this app ever held the
+ * verifier. A callback does not spend the verifier, since a bogus one (any
+ * app can send it) would wipe it before the real one arrives; the site burns
+ * every ticket on first use, right or wrong. The verifier goes once a redeem
+ * lands somewhere other than the sign-in page ([visitCompleted]), or when it
+ * expires.
  */
 object AppAuth {
     private const val PREFS = "app_auth"
     private const val KEY_VERIFIER = "verifier"
     private const val KEY_STARTED_AT = "started_at"
 
-    // As long as the site keeps the challenge waiting in the tab.
-    private const val TTL_MS = 10 * 60 * 1000L
+    // As long as the site keeps the challenge bound to the provider's state
+    // (a Strava sign-up can sit on the finish screen for a while).
+    private const val TTL_MS = 30 * 60 * 1000L
 
     val providers = setOf("google", "strava")
+
+    // The one redeem URL the WebView may load, set just before routing to it.
+    // A redeem link arriving any other way is refused by the route handler.
+    @Volatile
+    private var expectedRedeem: String? = null
+
+    // A redeem was sent and its outcome is not known yet.
+    @Volatile
+    private var redeemInFlight = false
 
     fun begin(activity: Activity, provider: String) {
         require(provider in providers)
@@ -56,17 +71,14 @@ object AppAuth {
         openInBrowserTab(activity, start)
     }
 
-    fun isCallback(uri: Uri?): Boolean =
-        uri?.scheme == "calcpace" && uri.host == "auth"
-
     /**
-     * The WebView location that completes the sign-in, or null when there is
-     * no sign-in of ours waiting (a stale link, a link from someone else, a
-     * second delivery of the same one). The verifier is spent either way.
+     * The WebView location that completes the sign-in, or null when no
+     * sign-in of ours is waiting (a stale link, or one from someone else).
+     * [routed] is true when it will go through the router (a running app),
+     * false for a cold start's first location, which never does.
      */
-    fun redeemLocation(context: Context, callback: Uri): String? {
-        val ticket = callback.getQueryParameter("ticket")?.takeIf { it.isNotBlank() } ?: return null
-        val verifier = takeVerifier(context) ?: return null
+    fun redeemLocation(context: Context, ticket: String, routed: Boolean): String? {
+        val verifier = freshVerifier(context) ?: return null
 
         return Calcpace.baseUrl.toUri().buildUpon()
             .path("/app_auth/redeem")
@@ -74,6 +86,36 @@ object AppAuth {
             .appendQueryParameter("verifier", verifier)
             .build()
             .toString()
+            .also {
+                expectedRedeem = if (routed) it else null
+                redeemInFlight = true
+            }
+    }
+
+    /**
+     * Every finished visit passes here. The first one after a redeem tells
+     * how it went: the site sends a failed redeem to the sign-in page and a
+     * good one anywhere else. Only a good one spends the verifier.
+     */
+    fun visitCompleted(context: Context, location: String) {
+        if (!redeemInFlight) return
+        val succeeded = AppAuthPaths.redeemSucceeded(location) ?: return
+
+        redeemInFlight = false
+        if (succeeded) context.prefs().edit(commit = true) { clear() }
+    }
+
+    /** A redeem that never got an answer keeps the verifier for a retry. */
+    fun visitFailed() {
+        redeemInFlight = false
+    }
+
+    /** True once for the URL [redeemLocation] just built. */
+    fun takeExpectedRedeem(location: String): Boolean {
+        val expected = expectedRedeem
+        if (expected == null || expected != location) return false
+        expectedRedeem = null
+        return true
     }
 
     fun openInBrowserTab(activity: Activity, uri: Uri) {
@@ -87,14 +129,15 @@ object AppAuth {
         }
     }
 
-    private fun takeVerifier(context: Context): String? {
+    private fun freshVerifier(context: Context): String? {
         val prefs = context.prefs()
-        val verifier = prefs.getString(KEY_VERIFIER, null)
         val startedAt = prefs.getLong(KEY_STARTED_AT, 0L)
-        prefs.edit(commit = true) { clear() }
-
         val fresh = System.currentTimeMillis() - startedAt in 0..TTL_MS
-        return verifier.takeIf { fresh }
+        if (!fresh) {
+            prefs.edit(commit = true) { clear() }
+            return null
+        }
+        return prefs.getString(KEY_VERIFIER, null)
     }
 
     private fun Context.prefs() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)

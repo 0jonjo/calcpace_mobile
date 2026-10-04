@@ -24,9 +24,10 @@ class MainActivity : HotwireActivity() {
     }
 
     // A cold start from a link or from a finished sign-in begins there instead
-    // of at the home page. Lazy because reading a sign-in callback spends it:
-    // asked twice, the answer must not change.
-    private val startLocation by lazy { locationFor(intent?.data) ?: Calcpace.baseUrl }
+    // of at the home page. A start location never passes through the router,
+    // so this is the only place a cold-start redeem is let through. Lazy so
+    // the answer can't change between the two times Hotwire asks.
+    private val startLocation by lazy { locationFor(intent?.data, routed = false) ?: Calcpace.baseUrl }
 
     override fun navigatorConfigurations() = listOf(
         NavigatorConfiguration(
@@ -39,26 +40,28 @@ class MainActivity : HotwireActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        locationFor(intent.data)?.let { delegate.currentNavigator?.route(it) }
+        val navigator = delegate.currentNavigator ?: return
+        locationFor(intent.data, routed = true)?.let { navigator.route(it) }
     }
 
     /**
      * Where an incoming link should take the WebView, or null to stay put.
-     *
-     * The provider callbacks (/auth/…) are the exception among site links: if
-     * Android hands one to the app instead of leaving it in the browser tab,
-     * the OAuth state it must match lives in the tab's cookies, so it goes
-     * back there.
+     * See [IncomingLink] for which links may do what.
      */
-    private fun locationFor(uri: Uri?): String? = when {
-        uri == null -> null
-        AppAuth.isCallback(uri) -> AppAuth.redeemLocation(this, uri)
-        Calcpace.isSiteUrl(uri) && uri.path.orEmpty().startsWith("/auth/") -> {
-            AppAuth.openInBrowserTab(this, uri)
-            null
+    private fun locationFor(uri: Uri?, routed: Boolean): String? {
+        if (uri == null) return null
+
+        return when (val link = IncomingLink.classify(uri.toString(), Calcpace.baseUrl)) {
+            is IncomingLink.SignIn -> AppAuth.redeemLocation(this, link.ticket, routed)
+            is IncomingLink.BrowserTab -> {
+                // The OAuth state this step must match lives in the tab's
+                // cookies, so it goes back there.
+                AppAuth.openInBrowserTab(this, uri)
+                null
+            }
+            is IncomingLink.Web -> link.url
+            IncomingLink.Ignore -> null
         }
-        Calcpace.isSiteUrl(uri) -> uri.toString()
-        else -> null
     }
 
     // Edge-to-edge is mandatory from Android 15. The site has no notion of

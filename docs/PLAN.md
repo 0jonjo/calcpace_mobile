@@ -11,9 +11,10 @@ Replace the Trusted Web Activity without anyone losing anything.
 - [x] calcpace.app App Links open in the app (assetlinks already serve the package)
 - [x] External links open in a Custom Tab; `mailto:`/`tel:` go to the system
 - [x] Edge-to-edge: the page stays clear of the status bar, gesture bar and keyboard
-- [x] Google/Strava sign-in through a Custom Tab with a PKCE-bound one-time ticket (app side)
-- [ ] Rails side: client-side app detection, `/configurations/android_v1.json`, `/app_auth/*` handoff, no Play banner or ads in the app (calcpace_web PR)
-- [ ] Smoke test on an emulator and on a real phone: browse, sign in by email, Google and Strava, sign out, open a shared link
+- [x] Google/Strava sign-in through a Custom Tab with a PKCE-bound one-time ticket, handed back by a verified App Link (`/app_auth/callback`); outside links can't load `/app_auth/*` into the WebView, however the path is spelled
+- [x] Rails side ([calcpace_web#363](https://github.com/0jonjo/calcpace_web/pull/363), merged, not yet deployed): client-side app detection, `/configurations/android_v1.json`, `/app_auth/*` hand-off with forced consent and exact paths, no Play banner or ads in the app
+- [x] Emulator smoke against a local server: browse, email sign-up and verification, in-app Strava button → Custom Tab, cold and warm hand-off, the callback page's "Open Calcpace" button, pull-to-refresh, mailto links, and the login-CSRF variants refused
+- [ ] Real phone against production after the Rails deploy: Google and Strava sign-in end to end (Chrome's handling of the callback App Link), sign out, open a shared link
 - [ ] Signed release build → Play internal testing → closed testing → production (after the TWA's production review is settled)
 
 Known gaps in phase 1:

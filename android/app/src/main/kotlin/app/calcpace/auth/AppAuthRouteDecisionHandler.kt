@@ -8,33 +8,42 @@ import dev.hotwire.navigation.navigator.NavigatorConfiguration
 import dev.hotwire.navigation.routing.Router
 
 /**
- * Catches the site's in-app sign-in links (/app_auth/google,
- * /app_auth/strava, with or without a locale prefix) and runs the sign-in in a
- * browser tab instead. See [AppAuth].
+ * Guards every in-app navigation that touches app_auth, however the path is
+ * spelled (see [AppAuthPaths]):
+ *
+ * - /app_auth/google and /app_auth/strava, the site's in-app sign-in
+ *   buttons, run the sign-in in a browser tab instead. See [AppAuth].
+ * - /app_auth/redeem loads only when [AppAuth] built that exact URL. A redeem
+ *   link anywhere else (a bio, a run name, a page the user was sent to)
+ *   would sign the WebView into someone else's account.
+ * - Everything else there is refused.
+ *
+ * It matches on the host alone, as broadly as the in-app navigation handler
+ * after it, so nothing it refuses can slip through on another scheme or port.
  */
 class AppAuthRouteDecisionHandler : Router.RouteDecisionHandler {
     override val name = "app-auth"
 
     override fun matches(proposal: VisitProposal, configuration: NavigatorConfiguration): Boolean =
-        providerFor(proposal.location) != null
+        AppAuthPaths.isGuarded(proposal.location, configuration.startLocation.toUri().host)
 
     override fun handle(
         proposal: VisitProposal,
         configuration: NavigatorConfiguration,
         activity: HotwireActivity
     ): Router.Decision {
-        providerFor(proposal.location)?.let { AppAuth.begin(activity, it) }
+        val location = proposal.location
+        if (!Calcpace.isSiteUrl(location.toUri())) return Router.Decision.CANCEL
+
+        AppAuthPaths.providerOf(location)?.let {
+            AppAuth.begin(activity, it)
+            return Router.Decision.CANCEL
+        }
+
+        if (AppAuthPaths.isRedeem(location) && AppAuth.takeExpectedRedeem(location)) {
+            return Router.Decision.NAVIGATE
+        }
+
         return Router.Decision.CANCEL
-    }
-
-    private fun providerFor(location: String): String? {
-        val uri = location.toUri()
-        if (!Calcpace.isSiteUrl(uri)) return null
-
-        return PATH.matchEntire(uri.path.orEmpty())?.groupValues?.get(1)
-    }
-
-    companion object {
-        val PATH = Regex("^(?:/[A-Za-z]{2}(?:-[A-Za-z]{2})?)?/app_auth/(google|strava)/?$")
     }
 }
