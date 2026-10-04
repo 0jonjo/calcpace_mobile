@@ -126,6 +126,8 @@ android {
     sourceSets {
         named("main") { java { srcDirs("src/main/kotlin") } }
         named("test") { java { srcDirs("src/test/kotlin") } }
+        // Debug-only tools (HcSeedActivity): never in a release build.
+        named("debug") { java { srcDirs("src/debug/kotlin") } }
     }
 }
 
@@ -165,6 +167,13 @@ dependencies {
     // Hotwire's KotlinXJsonConverter encodes bridge replies; 1.10.0 is the
     // line built against Kotlin 2.3.0.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
+
+    // Health Connect import: read on the phone, sent by a background worker.
+    implementation("androidx.health.connect:connect-client:1.1.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
+    // Hotwire 1.3.1 already ships OkHttp 5.3.2 at runtime only; declared to
+    // compile against it, at the same version, so there is one OkHttp.
+    implementation("com.squareup.okhttp3:okhttp:5.3.2")
 
     testImplementation("junit:junit:4.13.2")
 }

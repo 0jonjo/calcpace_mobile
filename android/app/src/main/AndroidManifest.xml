@@ -6,6 +6,19 @@
     <!-- "Your run is in" notifications, asked for only when the athlete taps
          "turn on" on the site's home card (Android 13+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Health Connect: runs and walks, read on the phone and sent to the
+         athlete's own account. The same five the Play Console declares; no
+         WRITE_* in a release build (the debug seed adds its own). -->
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_ELEVATION_GAINED" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
+    <!-- Health Connect as an app of its own (Android 13 and older). -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <application
         android:name=".CalcpaceApplication"
@@ -51,6 +64,30 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Health Connect's "privacy policy" link (Android 13 and older):
+             the privacy policy's Health Connect section, in a Custom Tab. -->
+        <activity
+            android:name=".health.PermissionsRationaleActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+
+        <!-- The same, from Android 14's permission usage screen. -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE"
+            android:targetActivity=".health.PermissionsRationaleActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- "Your run is in": data-only FCM messages, drawn by RunNotifications. -->
         <service

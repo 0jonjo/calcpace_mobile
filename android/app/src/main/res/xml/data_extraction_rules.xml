@@ -6,6 +6,10 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="push.xml" />
+        <!-- The Health Connect link token is bound to the WebView session on
+             this phone, and the changes token to this phone's Health Connect:
+             a copy elsewhere would upload with a session that isn't there. -->
+        <exclude domain="sharedpref" path="health_connect.xml" />
         <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
         <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
         <!-- The WebView's cookies (app_webview/Default/Cookies) and storage:
@@ -16,6 +20,10 @@
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="push.xml" />
+        <!-- The Health Connect link token is bound to the WebView session on
+             this phone, and the changes token to this phone's Health Connect:
+             a copy elsewhere would upload with a session that isn't there. -->
+        <exclude domain="sharedpref" path="health_connect.xml" />
         <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
         <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
         <!-- The WebView's cookies (app_webview/Default/Cookies) and storage:
