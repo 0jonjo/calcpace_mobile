@@ -13,6 +13,22 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import java.time.Instant
 
 /**
+ * Health Connect refused one of our calls with IllegalArgumentException.
+ * On Android 9–13 the provider app answers that way for its own reasons, so
+ * the sync retries it later; an IllegalArgumentException from our own code
+ * is a bug, and the worker fails rather than retry for ever.
+ */
+class HcCallRefused(cause: IllegalArgumentException) : Exception(cause)
+
+/** Runs one Health Connect client call, marking its IllegalArgumentException as [HcCallRefused]. */
+suspend fun <T> hcCall(call: suspend () -> T): T =
+    try {
+        call()
+    } catch (e: IllegalArgumentException) {
+        throw HcCallRefused(e)
+    }
+
+/**
  * Reads exercise sessions and their totals from Health Connect. Only what
  * [granted] allows is asked for: heart rate and climb are optional, and
  * asking for an ungranted type would throw.
@@ -23,9 +39,8 @@ class HcReader(private val client: HealthConnectClient, private val granted: Set
         val all = mutableListOf<ExerciseSessionRecord>()
         var page: String? = null
         do {
-            val response = client.readRecords(
-                ReadRecordsRequest(ExerciseSessionRecord::class, TimeRangeFilter.after(since), pageToken = page)
-            )
+            val request = ReadRecordsRequest(ExerciseSessionRecord::class, TimeRangeFilter.after(since), pageToken = page)
+            val response = hcCall { client.readRecords(request) }
             all += response.records
             page = response.pageToken
         } while (!page.isNullOrEmpty()) // the docs warn the last page may come back with ""
@@ -59,7 +74,7 @@ class HcReader(private val client: HealthConnectClient, private val granted: Set
         val hr = HealthConnect.HEART_RATE in granted
         val climb = HealthConnect.ELEVATION in granted
         // Not a run: no totals to read, it goes no further.
-        val result = if (type == null) null else client.aggregate(
+        val result = if (type == null) null else aggregate(
             AggregateRequest(
                 metrics = buildSet {
                     add(DistanceRecord.DISTANCE_TOTAL)
@@ -92,6 +107,8 @@ class HcReader(private val client: HealthConnectClient, private val granted: Set
             elevationGainM = result?.get(ElevationGainedRecord.ELEVATION_GAINED_TOTAL)?.inMeters,
         )
     }
+
+    private suspend fun aggregate(request: AggregateRequest) = hcCall { client.aggregate(request) }
 
     private fun wireType(type: Int): String? = when (type) {
         ExerciseSessionRecord.EXERCISE_TYPE_RUNNING -> "running"

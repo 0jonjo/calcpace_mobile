@@ -2,6 +2,7 @@ package app.calcpace.health
 
 import android.content.Context
 import android.os.RemoteException
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.changes.DeletionChange
 import androidx.health.connect.client.changes.UpsertionChange
@@ -31,7 +32,7 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val token = state.linkToken ?: return@withLock Result.success().also { HcSync.cancel(context) }
         val client = HealthConnect.client(context) ?: return@withLock Result.success()
         try {
-            val granted = client.permissionController.getGrantedPermissions()
+            val granted = hcCall { client.permissionController.getGrantedPermissions() }
             if (!granted.containsAll(HealthConnect.REQUIRED)) return@withLock giveUp(token)
             val run = HcSyncRun(Source(client, HcReader(client, granted)), state, HcUploader(token)::send, token)
             when (run.run()) {
@@ -47,8 +48,13 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Result.success()
         } catch (_: IllegalStateException) {
             Result.retry() // Health Connect's rate limit: back off
-        } catch (_: IllegalArgumentException) {
-            Result.retry() // the provider app (Android 9–13) refusing a read: later, never a dead job
+        } catch (_: HcCallRefused) {
+            Result.retry() // the provider app (Android 9–13) refusing a call: later
+        } catch (e: IllegalArgumentException) {
+            // A bug of ours, not Health Connect's: retrying would back off for
+            // ever. The message is ours too; the token is never in it.
+            Log.e(TAG, "sync failed", e)
+            Result.failure()
         } catch (_: RemoteException) {
             Result.retry()
         } catch (_: IOException) {
@@ -65,7 +71,7 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     /** Health Connect for [HcSyncRun]: records read and turned into [SessionFacts]. */
     private class Source(private val client: HealthConnectClient, private val reader: HcReader) : HcSyncRun.Source {
         override suspend fun changesToken(): String =
-            client.getChangesToken(ChangesTokenRequest(setOf(ExerciseSessionRecord::class)))
+            hcCall { client.getChangesToken(ChangesTokenRequest(setOf(ExerciseSessionRecord::class))) }
 
         override suspend fun sessionsSince(since: Instant): List<SessionFacts> =
             reader.sessionsSince(since).map { reader.facts(it) }
@@ -100,6 +106,8 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
 
     private companion object {
+        const val TAG = "HcSync"
+
         /** The periodic sync and the foreground one never run at once in this process. */
         val LOCK = Mutex()
     }
