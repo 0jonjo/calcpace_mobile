@@ -10,6 +10,8 @@
     <application
         android:name=".CalcpaceApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:enableOnBackInvokedCallback="true"
         tools:targetApi="33"
         android:icon="@mipmap/ic_launcher"

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+. Push state belongs to this install on this phone: an FCM
+     token or an opt-in carried to a new phone (or restored after a reinstall)
+     would point at the wrong device or skip the athlete's own choice. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="push.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
+        <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="push.xml" />
+        <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
+        <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+    </device-transfer>
+</data-extraction-rules>

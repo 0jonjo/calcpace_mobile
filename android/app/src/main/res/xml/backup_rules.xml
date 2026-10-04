@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older; see data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="push.xml" />
+    <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
+    <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+</full-backup-content>
