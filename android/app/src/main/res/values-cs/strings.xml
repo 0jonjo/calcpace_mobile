@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Běhy</string>
     <string name="channel_runs_description">Když váš běh dorazí do Calcpace</string>
+    <string name="hc_link_confirm_title">Importovat běhy z Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace načte vaše běhy a procházky z Health Connect a přidá je do účtu, ke kterému jste přihlášeni.</string>
+    <string name="hc_link_confirm_ok">Importovat</string>
 </resources>

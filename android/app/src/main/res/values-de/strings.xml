@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Läufe</string>
     <string name="channel_runs_description">Wenn dein Lauf in Calcpace ankommt</string>
+    <string name="hc_link_confirm_title">Läufe aus Health Connect importieren?</string>
+    <string name="hc_link_confirm_body">Calcpace liest deine Läufe und Spaziergänge aus Health Connect und fügt sie dem Konto hinzu, mit dem du angemeldet bist.</string>
+    <string name="hc_link_confirm_ok">Importieren</string>
 </resources>

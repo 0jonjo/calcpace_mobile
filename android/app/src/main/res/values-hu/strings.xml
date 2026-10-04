@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Futások</string>
     <string name="channel_runs_description">Amikor a futásod megérkezik a Calcpace-be</string>
+    <string name="hc_link_confirm_title">Importálod a futásokat a Health Connectből?</string>
+    <string name="hc_link_confirm_body">A Calcpace beolvassa a futásaidat és sétáidat a Health Connectből, és hozzáadja őket ahhoz a fiókhoz, amelybe be vagy jelentkezve.</string>
+    <string name="hc_link_confirm_ok">Importálás</string>
 </resources>

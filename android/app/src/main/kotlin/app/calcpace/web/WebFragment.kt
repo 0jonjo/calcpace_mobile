@@ -1,6 +1,7 @@
 package app.calcpace.web
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -8,13 +9,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
+import androidx.health.connect.client.PermissionController
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
 import app.calcpace.push.PendingCallbacks
 import app.calcpace.push.PermissionPrompt
 import app.calcpace.push.Push
 import app.calcpace.push.PushStatus
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.hotwire.core.turbo.errors.VisitError
 import dev.hotwire.core.turbo.webview.HotwireWebView
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
@@ -50,6 +54,14 @@ class WebFragment : HotwireWebFragment() {
                 Push.promptFinished(context, outcome)
             }
             notificationCallbacks.resolve(granted)
+        }
+
+    private val healthCallbacks = PendingCallbacks<Set<String>>()
+    private val healthConfirmations = PendingCallbacks<Boolean>()
+    private var healthDialog: AlertDialog? = null
+    private val healthPermissions =
+        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+            healthCallbacks.resolve(granted)
         }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -89,5 +101,53 @@ class WebFragment : HotwireWebFragment() {
         rationaleBeforePrompt = shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
         promptStartedAt = SystemClock.elapsedRealtime()
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /**
+     * Health Connect's own permission screen, for the health bridge
+     * component. A second call while it is up waits for the same answer
+     * instead of launching it again.
+     */
+    fun requestHealthPermissions(permissions: Set<String>, callback: (Set<String>) -> Unit) {
+        if (!healthCallbacks.enqueue(callback)) return
+        try {
+            healthPermissions.launch(permissions)
+        } catch (_: ActivityNotFoundException) {
+            healthCallbacks.resolve(emptySet()) // Health Connect went away meanwhile
+        }
+    }
+
+    /**
+     * Asks the athlete to confirm linking Health Connect to the signed-in
+     * account, for when Health Connect has nothing left to ask (see
+     * HcLinkGate). One dialog at a time; every caller gets its answer, once.
+     * The dialog lives as long as this fragment's view: going away (or a
+     * configuration change) dismisses it and answers no.
+     */
+    fun confirmHealthLink(callback: (Boolean) -> Unit) {
+        if (!healthConfirmations.enqueue(callback)) return
+        var answer = false
+        healthDialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.hc_link_confirm_title)
+            .setMessage(R.string.hc_link_confirm_body)
+            .setPositiveButton(R.string.hc_link_confirm_ok) { _, _ -> answer = true }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener {
+                healthDialog = null
+                healthConfirmations.resolve(answer)
+            }
+            .show()
+    }
+
+    override fun onDestroyView() {
+        // Answered here and now, not from the dismiss message the dialog
+        // would post after the window is gone.
+        healthDialog?.let { dialog ->
+            healthDialog = null
+            dialog.setOnDismissListener(null)
+            dialog.dismiss()
+            healthConfirmations.resolve(false)
+        }
+        super.onDestroyView()
     }
 }

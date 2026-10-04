@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Løpeturer</string>
     <string name="channel_runs_description">Når løpeturen din kommer inn i Calcpace</string>
+    <string name="hc_link_confirm_title">Importere løpeturer fra Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace leser løpeturene og gåturene dine fra Health Connect og legger dem til i kontoen du er logget inn på.</string>
+    <string name="hc_link_confirm_ok">Importer</string>
 </resources>
