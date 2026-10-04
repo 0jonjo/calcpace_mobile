@@ -1,6 +1,7 @@
 package app.calcpace.web
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
@@ -9,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
+import androidx.health.connect.client.PermissionController
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
 import app.calcpace.push.PendingCallbacks
@@ -52,6 +54,12 @@ class WebFragment : HotwireWebFragment() {
             notificationCallbacks.resolve(granted)
         }
 
+    private val healthCallbacks = PendingCallbacks<Set<String>>()
+    private val healthPermissions =
+        registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
+            healthCallbacks.resolve(granted)
+        }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_web, container, false)
 
@@ -89,5 +97,19 @@ class WebFragment : HotwireWebFragment() {
         rationaleBeforePrompt = shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
         promptStartedAt = SystemClock.elapsedRealtime()
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /**
+     * Health Connect's own permission screen, for the health bridge
+     * component. A second call while it is up waits for the same answer
+     * instead of launching it again.
+     */
+    fun requestHealthPermissions(permissions: Set<String>, callback: (Set<String>) -> Unit) {
+        if (!healthCallbacks.enqueue(callback)) return
+        try {
+            healthPermissions.launch(permissions)
+        } catch (_: ActivityNotFoundException) {
+            healthCallbacks.resolve(emptySet()) // Health Connect went away meanwhile
+        }
     }
 }
