@@ -29,25 +29,30 @@ val signingProperties = Properties().apply {
 // The google-services plugin is not used: it insists on the file sitting
 // inside the module.
 val firebasePackage = "app.calcpace.twa"
-val googleServicesFile = file(
+// A relative -Pcalcpace.googleServices resolves against android/.
+val googleServicesFile = rootProject.file(
     providers.gradleProperty("calcpace.googleServices").orNull
         ?: "${System.getProperty("user.home")}/.config/calcpace/google-services.json"
 )
 
 @Suppress("UNCHECKED_CAST")
 val firebase: Map<String, String> = if (googleServicesFile.isFile) {
-    val json = JsonSlurper().parse(googleServicesFile) as Map<String, Any?>
-    val project = json["project_info"] as Map<String, Any?>
-    val client = (json["client"] as List<Map<String, Any?>>).firstOrNull {
-        val info = it["client_info"] as Map<String, Any?>
-        (info["android_client_info"] as Map<String, Any?>)["package_name"] == firebasePackage
-    } ?: throw GradleException("$googleServicesFile has no Android client for $firebasePackage")
-    mapOf(
-        "PROJECT_ID" to project["project_id"] as String,
-        "SENDER_ID" to project["project_number"] as String,
-        "APP_ID" to (client["client_info"] as Map<String, Any?>)["mobilesdk_app_id"] as String,
-        "API_KEY" to (client["api_key"] as List<Map<String, Any?>>).first()["current_key"] as String,
-    )
+    runCatching {
+        val json = JsonSlurper().parse(googleServicesFile) as Map<String, Any?>
+        val project = json["project_info"] as Map<String, Any?>
+        val client = (json["client"] as List<Map<String, Any?>>).firstOrNull {
+            val info = it["client_info"] as Map<String, Any?>
+            (info["android_client_info"] as Map<String, Any?>)["package_name"] == firebasePackage
+        } ?: throw GradleException("no Android client for $firebasePackage")
+        val apiKey = (client["api_key"] as List<Map<String, Any?>>).firstOrNull()
+            ?: throw GradleException("no api_key for $firebasePackage")
+        mapOf(
+            "PROJECT_ID" to project["project_id"] as String,
+            "SENDER_ID" to project["project_number"] as String,
+            "APP_ID" to (client["client_info"] as Map<String, Any?>)["mobilesdk_app_id"] as String,
+            "API_KEY" to apiKey["current_key"] as String,
+        )
+    }.getOrElse { throw GradleException("Can't read Firebase options from $googleServicesFile: ${it.message}") }
 } else {
     emptyMap()
 }
