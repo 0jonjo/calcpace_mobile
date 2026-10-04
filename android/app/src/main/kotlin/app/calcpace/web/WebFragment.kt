@@ -9,6 +9,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.Toolbar
 import androidx.health.connect.client.PermissionController
 import app.calcpace.R
@@ -57,6 +58,7 @@ class WebFragment : HotwireWebFragment() {
 
     private val healthCallbacks = PendingCallbacks<Set<String>>()
     private val healthConfirmations = PendingCallbacks<Boolean>()
+    private var healthDialog: AlertDialog? = null
     private val healthPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             healthCallbacks.resolve(granted)
@@ -118,17 +120,34 @@ class WebFragment : HotwireWebFragment() {
     /**
      * Asks the athlete to confirm linking Health Connect to the signed-in
      * account, for when Health Connect has nothing left to ask (see
-     * HcLinkGate). One dialog at a time; every caller gets its answer.
+     * HcLinkGate). One dialog at a time; every caller gets its answer, once.
+     * The dialog lives as long as this fragment's view: going away (or a
+     * configuration change) dismisses it and answers no.
      */
     fun confirmHealthLink(callback: (Boolean) -> Unit) {
         if (!healthConfirmations.enqueue(callback)) return
         var answer = false
-        MaterialAlertDialogBuilder(requireContext())
+        healthDialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.hc_link_confirm_title)
             .setMessage(R.string.hc_link_confirm_body)
             .setPositiveButton(R.string.hc_link_confirm_ok) { _, _ -> answer = true }
             .setNegativeButton(android.R.string.cancel, null)
-            .setOnDismissListener { healthConfirmations.resolve(answer) }
+            .setOnDismissListener {
+                healthDialog = null
+                healthConfirmations.resolve(answer)
+            }
             .show()
+    }
+
+    override fun onDestroyView() {
+        // Answered here and now, not from the dismiss message the dialog
+        // would post after the window is gone.
+        healthDialog?.let { dialog ->
+            healthDialog = null
+            dialog.setOnDismissListener(null)
+            dialog.dismiss()
+            healthConfirmations.resolve(false)
+        }
+        super.onDestroyView()
     }
 }
