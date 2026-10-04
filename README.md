@@ -38,7 +38,7 @@ cd android
 
 Debug builds install as `app.calcpace.twa.debug`, next to the Play version.
 
-Push notifications need Firebase options, read at build time from a `google-services.json` that never enters the repo (it is public): `~/.config/calcpace/google-services.json` by default, or `-Pcalcpace.googleServices=/path/to/google-services.json`. Without the file the app builds and runs with push off (the bridge reports `unavailable`); that is how CI builds it. A release build fails without it. The file only knows the real package, so test push on a debug build with `-Pcalcpace.debugIdSuffix=`. Release signing reads a properties file that stays out of the repo (`~/.calcpace/signing.properties`, or a path in `CALCPACE_SIGNING`) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`.
+Push notifications need Firebase options, read at build time from a `google-services.json` that never enters the repo (it is public): `~/.config/calcpace/google-services.json` by default, or `-Pcalcpace.googleServices=/path/to/google-services.json` (a relative path resolves against `android/`). Without the file the app builds and runs with push off (the bridge reports `unavailable`); that is how CI builds it. A release build fails without it, and an unreadable file fails any build. The file only knows the real package, so a default debug build (`app.calcpace.twa.debug`) also reports `unavailable`: test push on a debug build with `-Pcalcpace.debugIdSuffix=`. Release signing reads a properties file that stays out of the repo (`~/.calcpace/signing.properties`, or a path in `CALCPACE_SIGNING`) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`.
 
 ## Roadmap
 
