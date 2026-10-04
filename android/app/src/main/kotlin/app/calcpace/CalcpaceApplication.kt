@@ -2,6 +2,7 @@ package app.calcpace
 
 import android.app.Application
 import app.calcpace.auth.AppAuthRouteDecisionHandler
+import app.calcpace.push.Push
 import app.calcpace.web.WebFragment
 import dev.hotwire.core.config.Hotwire
 import dev.hotwire.core.logging.HotwireLogLevel
@@ -16,6 +17,7 @@ import dev.hotwire.navigation.routing.SystemNavigationRouteDecisionHandler
 class CalcpaceApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        Push.init(this)
         configureHotwire()
     }
 
