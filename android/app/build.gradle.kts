@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.net.URI
 import java.util.Properties
 
 plugins {
@@ -54,7 +55,18 @@ android {
             signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         debug {
-            applicationIdSuffix = ".debug"
+            // ".debug" lets it sit next to the Play build. Pass
+            // -Pcalcpace.debugIdSuffix= (empty) to test what only the real
+            // package receives, like the sign-in page's "Open Calcpace" intent.
+            applicationIdSuffix = (project.findProperty("calcpace.debugIdSuffix") as String?) ?: ".debug"
+            // Lets a local server's links (e.g. the sign-in page's
+            // "Open Calcpace" intent) reach a debug build, as calcpace.app's
+            // App Links reach the release one.
+            val debugSite = URI(
+                (project.findProperty("calcpace.baseUrl") as String?) ?: "https://calcpace.app"
+            )
+            manifestPlaceholders["debugSiteScheme"] = debugSite.scheme
+            manifestPlaceholders["debugSiteHost"] = debugSite.host
             versionNameSuffix = "-debug"
         }
     }

@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds may point at a local Rails server over plain HTTP. -->
+<!-- Debug builds may point at a local Rails server over plain HTTP, and
+     accept that server's links the way release accepts calcpace.app's. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application android:usesCleartextTraffic="true" />
+    <application android:usesCleartextTraffic="true">
+        <activity
+            android:name="app.calcpace.main.MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="${debugSiteHost}"
+                    android:scheme="${debugSiteScheme}" />
+            </intent-filter>
+        </activity>
+    </application>
 </manifest>
