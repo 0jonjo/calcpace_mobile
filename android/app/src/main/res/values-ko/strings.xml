@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_runs_name">러닝</string>
+    <string name="channel_runs_description">러닝 기록이 Calcpace에 도착하면</string>
+</resources>

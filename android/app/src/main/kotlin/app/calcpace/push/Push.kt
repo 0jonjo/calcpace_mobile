@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.fragment.app.Fragment
@@ -53,7 +52,7 @@ object Push {
             sdkInt = Build.VERSION.SDK_INT,
             optedIn = prefs(context).getBoolean(KEY_OPTED_IN, false),
             granted = runtimePermission && isPermissionGranted(context),
-            notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled(),
+            notificationsEnabled = RunNotifications.areEnabled(context),
             askedBefore = prefs(context).getBoolean(KEY_ASKED, false),
             canAskAgain = runtimePermission &&
                 fragment.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS),

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="channel_runs_name">Carreras</string>
+    <string name="channel_runs_description">Cuando tu carrera llega a Calcpace</string>
+</resources>
