@@ -1,6 +1,7 @@
 package app.calcpace.health
 
 import android.content.Context
+import android.util.Log
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -11,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -23,11 +25,18 @@ import kotlinx.coroutines.launch
  * in the background when they are. Nothing at all without a link token.
  */
 object HcSync {
+    private const val TAG = "HcSync"
     private const val NOW = "hc-sync-now"
     private const val PERIODIC = "hc-sync"
 
-    /** Off the main thread: asking WorkManager what is queued reads its database. */
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    /**
+     * Off the main thread: asking WorkManager what is queued reads its
+     * database, which can throw (SQLiteException on a full disk). A sync not
+     * enqueued is caught up by the next one; it must never crash the app.
+     */
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, e -> Log.w(TAG, "could not enqueue a sync", e) }
+    )
 
     private val NETWORK = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
@@ -48,6 +57,9 @@ object HcSync {
             workManager.enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
             return
         }
+        // Check, then enqueue: a sync that starts running in between is
+        // replaced (cancelled and run again), which the server's idempotent
+        // upload makes harmless.
         scope.launch {
             val running = workManager.getWorkInfosForUniqueWorkFlow(NOW).first().any { it.state == WorkInfo.State.RUNNING }
             workManager.enqueueUniqueWork(NOW, if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE, request)
