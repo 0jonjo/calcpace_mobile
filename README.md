@@ -37,3 +37,7 @@ Debug builds install as `app.calcpace.twa.debug`, next to the Play version. Rele
 ## Roadmap
 
 See [`docs/PLAN.md`](docs/PLAN.md).
+
+## License
+
+The code is released under the [MIT License](LICENSE). The Calcpace name, logo and icon are not covered by it.
