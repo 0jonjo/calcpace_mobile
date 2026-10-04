@@ -133,12 +133,14 @@ object HcPayload {
     /** The link token the page hands over: 43 base64url characters (HealthConnectLink on the server). */
     fun isLinkToken(token: String?): Boolean = token != null && LINK_TOKEN.matches(token)
 
-    /** The token in a "link" message's data (`{ "token": T }`), or null when it is missing or malformed. */
-    fun linkTokenFrom(jsonData: String?): String? {
-        val token = runCatching {
-            (lenient.parseToJsonElement(jsonData ?: return null).jsonObject["token"] as? JsonPrimitive)
-                ?.takeIf { it.isString }?.content
-        }.getOrNull()
-        return token?.takeIf { isLinkToken(it) }
-    }
+    /** The token in a "link" message's data (`{ "token": T, "grant": G }`), or null when it is missing or malformed. */
+    fun linkTokenFrom(jsonData: String?): String? = stringField(jsonData, "token")?.takeIf { isLinkToken(it) }
+
+    /** The grant in a "link" message's data: what the "enable" reply handed out (HcLinkGate). */
+    fun linkGrantFrom(jsonData: String?): String? = stringField(jsonData, "grant")
+
+    private fun stringField(jsonData: String?, key: String): String? = runCatching {
+        (lenient.parseToJsonElement(jsonData ?: return null).jsonObject[key] as? JsonPrimitive)
+            ?.takeIf { it.isString }?.content
+    }.getOrNull()
 }

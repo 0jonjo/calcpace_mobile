@@ -21,13 +21,14 @@ import kotlinx.serialization.Serializable
  *
  * - "connect" `{}` → `{ status, linked, background }`: where things stand.
  *   Never asks anything.
- * - "enable" `{}` → `{ status, granted, background }`, after Health
+ * - "enable" `{}` → `{ status, granted, background, grant? }`, after Health
  *   Connect's permission screen (or Play's page, when Health Connect needs
  *   installing or updating). `granted` = exercise and distance allowed and,
- *   when they had been allowed before, the athlete confirmed in the app.
- * - "link" `{ token }` → `{ linked }`: the token the page got from
- *   POST /health_connect/link; the app keeps it and starts syncing. Only
- *   right after a granted "enable" on this page ([HcLinkGate]).
+ *   when they had been allowed before, the athlete confirmed in the app;
+ *   only then comes `grant`, a one-time value for "link" ([HcLinkGate]).
+ * - "link" `{ token, grant }` → `{ linked }`: the token the page got from
+ *   POST /health_connect/link, with the grant of its "enable"; the app
+ *   keeps the token and starts syncing.
  * - "unlink" `{}` → `{ linked: false }`: the server no longer has this
  *   session's link, so the app forgets its token too.
  *
@@ -119,8 +120,7 @@ class HealthComponent(
         } else {
             true
         }
-        if (confirmed) linkGate.open()
-        reply(message, answer.copy(granted = confirmed))
+        reply(message, answer.copy(granted = confirmed, grant = if (confirmed) linkGate.open() else null))
     }
 
     private fun enabled(client: HealthConnectClient, granted: Set<String>) =
@@ -132,8 +132,9 @@ class HealthComponent(
 
     private suspend fun link(fragment: WebFragment, message: Message) {
         val context = fragment.requireContext()
-        // One link per yes, whatever the token turns out to be.
-        if (!linkGate.consume()) return reply(message, Linked(false))
+        // Only with the grant of this page's last granted "enable", once:
+        // any link closes the gate, right or wrong.
+        if (!linkGate.consume(HcPayload.linkGrantFrom(message.jsonData))) return reply(message, Linked(false))
         val token = HcPayload.linkTokenFrom(message.jsonData) ?: return reply(message, Linked(false))
         val client = HealthConnect.client(context)
         val background = client != null &&
@@ -161,8 +162,9 @@ class HealthComponent(
     @Serializable
     data class State(val status: String, val linked: Boolean, val background: Boolean)
 
+    /** [grant] only with granted = true: "link" must carry it back (HcLinkGate). */
     @Serializable
-    data class Enabled(val status: String, val granted: Boolean, val background: Boolean)
+    data class Enabled(val status: String, val granted: Boolean, val background: Boolean, val grant: String? = null)
 
     @Serializable
     data class Linked(val linked: Boolean)

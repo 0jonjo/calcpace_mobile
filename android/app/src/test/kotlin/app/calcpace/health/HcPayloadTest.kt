@@ -175,4 +175,14 @@ class HcPayloadTest {
         assertNull(HcPayload.linkTokenFrom("not json"))
         assertNull(HcPayload.linkTokenFrom(null))
     }
+
+    @Test
+    fun theGrantComesOutOfALinkMessage() {
+        assertEquals("g-1", HcPayload.linkGrantFrom("""{"token":"t","grant":"g-1"}"""))
+        assertNull(HcPayload.linkGrantFrom("""{"token":"t"}"""))
+        assertNull(HcPayload.linkGrantFrom("""{"grant":null}"""))
+        assertNull(HcPayload.linkGrantFrom("""{"grant":7}"""))
+        assertNull(HcPayload.linkGrantFrom("nope"))
+        assertNull(HcPayload.linkGrantFrom(null))
+    }
 }

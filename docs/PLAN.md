@@ -62,16 +62,17 @@ Ordered by impact for effort.
    | Event (web → app) | `data` sent | Reply `data` |
    |---|---|---|
    | `connect` | `{}` | `{ "status": S, "linked": L, "background": B }` |
-   | `enable` | `{}` | `{ "status": S, "granted": G, "background": B }`, after Health Connect's screen (or Play's, for `install_required`) |
-   | `link` | `{ "token": T }` | `{ "linked": true }`, or `{ "linked": false }` if T is malformed |
+   | `enable` | `{}` | `{ "status": S, "granted": G, "background": B, "grant": N }`, after Health Connect's screen (or Play's, for `install_required`); `grant` only with `granted: true` |
+   | `link` | `{ "token": T, "grant": N }` | `{ "linked": true }`, or `{ "linked": false }` if T is malformed or N isn't the open grant |
    | `unlink` | `{}` | `{ "linked": false }` |
 
    - `S` is `available`, `install_required` (install or update Health Connect from Play) or `unavailable`.
    - `L`: the app holds a link token. `B`: background reads exist on the phone and are allowed. `G`: `READ_EXERCISE` and `READ_DISTANCE` allowed (heart rate and climb are optional).
    - `T`: 43 base64url characters; the app refuses anything else.
+   - `N`: a one-time grant, 43 base64url characters (256 random bits), handed out only in the reply to a granted `enable` (the reply reaches only the caller's callback in the page, not other frames). `link` is taken only with the latest `N`, once, within 5 minutes; any `link` closes the gate, right or wrong, so a guessed or missing `N` means a new `enable`. (Contract change agreed in review round 2; calcpace_web mirrors it.)
    - Only the home (`/`, `/<locale>`) and the account page (`/account`, `/<locale>/account`) may drive it.
-   - `link` is only taken within 5 minutes of an `enable` on the same page that answered `granted: true`, once per `enable` (any frame of a page can reach the bridge). When exercise and distance were allowed before, Health Connect may show nothing, so the app asks for a native confirmation before answering `granted: true`; "Cancel" answers `granted: false`. Outside that window `link` answers `{ "linked": false }`.
-   - The page, on `enable` with `granted: true`, posts to `/health_connect/link` (cookie + CSRF), gets `{ "token": T }`, sends `link`, and reloads on `{ "linked": true }`. If `L` is true and the server has no link for this session, it sends `unlink`.
+   - Any frame of a page can reach the bridge, hence `N`. When exercise and distance were allowed before, Health Connect may show nothing, so the app asks for a native confirmation before answering `granted: true`; "Cancel" answers `granted: false`.
+   - The page, on `enable` with `granted: true`, posts to `/health_connect/link` (cookie + CSRF), gets `{ "token": T }`, sends `link` with `T` and the `grant` of that `enable` reply, and reloads on `{ "linked": true }`. If `L` is true and the server has no link for this session, it sends `unlink`.
 
    Upload (app → server): `POST /health_connect/sessions`, `Authorization: Bearer T`, JSON, at most 50 sessions and 200 deleted ids per request:
 
