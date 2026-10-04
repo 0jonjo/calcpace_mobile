@@ -17,7 +17,13 @@ import java.io.ByteArrayOutputStream
  * java.net.URI: the WebView happily follows "…/app_auth/redeem?…#%zz", which
  * java.net.URI refuses to parse, and a guard that gives up on what it can't
  * parse lets exactly that URL through to the next route handler. Whatever
- * this parser can't read is guarded too.
+ * http(s) or scheme-less URL this parser can't read is guarded too; other
+ * schemes (mailto:, tel:) are not the site's and pass to the system.
+ *
+ * Before parsing, a URL is normalised the way Chromium does it (outer
+ * whitespace and C0 trimmed, tab/CR/LF dropped, "\" read as "/"), so the
+ * host and path seen here are the ones the WebView would request even if a
+ * raw string ever reached the router.
  */
 object AppAuthPaths {
     private const val LOCALES = "en|pt-BR|es|de|fr|ja|it|nl|ko|sv|pl|no|zh-TW|hu|cs|ru"
@@ -29,12 +35,13 @@ object AppAuthPaths {
     private val PROVIDER_STEP = Regex("^$PREFIX/auth(?:/.*)?$")
     private val SIGN_IN_PAGE = Regex("^$PREFIX/session(?:/new)?$")
     private val ABSOLUTE = Regex("^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)")
+    private val SCHEME = Regex("^([A-Za-z][A-Za-z0-9+.-]*):")
 
     private class Parts(val host: String, val rawPath: String, val cleanPath: String)
 
     /** True for any URL on [host] whose path, however spelled, touches app_auth, and for anything unreadable. */
     fun isGuarded(url: String, host: String?): Boolean {
-        val parts = parse(url) ?: return true
+        val parts = parse(url) ?: return isWebOrUnknownScheme(url)
         return parts.host.equals(host, ignoreCase = true) &&
             parts.cleanPath.contains("app_auth", ignoreCase = true)
     }
@@ -63,12 +70,20 @@ object AppAuthPaths {
         }
     }
 
+    private fun isWebOrUnknownScheme(url: String): Boolean {
+        val scheme = SCHEME.find(normalize(url))?.groupValues?.get(1)?.lowercase()
+        return scheme == null || scheme == "http" || scheme == "https"
+    }
+
+    private fun normalize(url: String): String =
+        url.trim { it <= ' ' }.filterNot { it == '\t' || it == '\n' || it == '\r' }.replace('\\', '/')
+
     private fun parse(url: String): Parts? {
-        val match = ABSOLUTE.find(url.trim()) ?: return null
+        val match = ABSOLUTE.find(normalize(url)) ?: return null
         val authority = match.groupValues[2].substringAfterLast('@')
         val host = if (authority.startsWith("[")) authority.substringBefore(']') + "]" else authority.substringBefore(':')
         val rawPath = match.groupValues[3].ifEmpty { "/" }
-        return Parts(host.lowercase(), rawPath, clean(rawPath))
+        return Parts(host.lowercase().trimEnd('.'), rawPath, clean(rawPath))
     }
 
     // Decoded, repeated slashes collapsed, dot segments resolved: roughly

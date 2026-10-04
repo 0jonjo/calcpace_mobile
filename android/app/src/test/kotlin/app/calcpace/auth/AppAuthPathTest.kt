@@ -50,6 +50,29 @@ class AppAuthPathTest {
         assertTrue(AppAuthPaths.isGuarded("$site/%zz%61pp_auth/redeem", host))
     }
 
+    // Round-4 review: failing closed must not swallow the site's mailto: and
+    // tel: links, which belong to the system's mail and phone apps.
+    @Test
+    fun otherSchemesAreNotTheGuardsBusiness() {
+        listOf("mailto:contact@calcpace.app", "tel:+5584999999999", "sms:123", "geo:0,0", "about:blank")
+            .forEach { assertFalse(it, AppAuthPaths.isGuarded(it, host)) }
+    }
+
+    // Chromium reads "\\" as "/" and drops tab/CR/LF before requesting; the
+    // guard must see the same host and path.
+    @Test
+    fun rawStringsAreReadTheWayChromiumReadsThem() {
+        listOf(
+            "https://calcpace.app\\app_auth\\redeem",
+            "https://calcpace.app\\@evil.example/../app_auth/redeem",
+            "https://calcpace.app/app_\nauth/redeem",
+            "https://calcpace.app/app_\tauth/redeem",
+            "  https://calcpace.app/app_auth/redeem  ",
+            "https://calcpace.app./app_auth/redeem",
+            "HTTPS://CALCPACE.APP/APP_AUTH/REDEEM"
+        ).forEach { assertTrue(it, AppAuthPaths.isGuarded(it, host)) }
+    }
+
     @Test
     fun malformedEscapesDoNotCrashOrDecodeWrongly() {
         assertFalse(AppAuthPaths.isGuarded("$site/%+1app/%-1", host))
