@@ -8,6 +8,7 @@ import java.time.Instant
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -200,18 +201,26 @@ class HcSyncRunTest {
 
     @Test
     fun aChangesTokenHealthConnectRefusesMeansTheInitialReadAgain() {
-        listOf(IllegalArgumentException("bad token"), UnsupportedOperationException()).forEach { refusal ->
-            val state = HcState(FakePrefs()).also { it.link(token); it.advance(token, "c1", emptyMap()) }
-            source.refused["c1"] = refusal
-            assertEquals("$refusal", Outcome.DONE, run(state))
-            assertEquals("changes-0", state.changesToken)
-        }
+        changesFrom("c1")
+        source.refused["c1"] = HcSyncRun.TokenRefused(IllegalArgumentException("bad token"))
+        assertEquals(Outcome.DONE, run())
+        assertTrue(source.calls.contains("token"))
+        assertEquals("changes-0", state.changesToken)
+    }
+
+    @Test
+    fun anyOtherErrorReadingTheChangesIsNotARefusedToken() {
+        changesFrom("c1")
+        source.refused["c1"] = IllegalArgumentException("from an aggregate")
+        assertThrows(IllegalArgumentException::class.java) { run() }
+        assertEquals("c1", state.changesToken)
+        assertTrue("no 30-day re-read", "token" !in source.calls)
     }
 
     @Test
     fun anInitialReadAfterARefusedTokenThatFailsStartsFromScratchNextTime() {
         changesFrom("c1")
-        source.refused["c1"] = IllegalArgumentException()
+        source.refused["c1"] = HcSyncRun.TokenRefused(UnsupportedOperationException())
         source.window = listOf(run("r1"))
         uploader.answers += 500
         assertEquals(Outcome.RETRY, run())

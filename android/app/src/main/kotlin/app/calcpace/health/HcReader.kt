@@ -49,6 +49,8 @@ class HcReader(private val client: HealthConnectClient, private val granted: Set
             Read.Found(client.readRecord(ExerciseSessionRecord::class, id).record)
         } catch (e: RemoteException) {
             if (HcSyncPlan.isNotFound(e.message)) Read.Gone else Read.Unreadable
+        } catch (_: IllegalArgumentException) {
+            Read.Unreadable // the provider app (Android 9–13) may refuse an id this way: try again later
         }
 
     /** Distance, heart rate and climb of this session, from the app that recorded it only. */

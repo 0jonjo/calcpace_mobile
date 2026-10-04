@@ -33,7 +33,7 @@ class HcSyncRun(
     interface Source {
         suspend fun changesToken(): String
         suspend fun sessionsSince(since: Instant): List<SessionFacts>
-        /** One page of changes. May throw IllegalArgumentException or UnsupportedOperationException for a token it refuses. */
+        /** One page of changes; [TokenRefused] when Health Connect won't take [token] at all. */
         suspend fun changes(token: String): Changes
         suspend fun session(id: String): Lookup
     }
@@ -53,6 +53,14 @@ class HcSyncRun(
         /** Couldn't tell this time: it stays pending. */
         data object Unreadable : Lookup
     }
+
+    /**
+     * Health Connect refused the changes token itself (IllegalArgumentException
+     * or UnsupportedOperationException from getChanges, e.g. after a wipe or a
+     * reinstall). Thrown only for that call: an error while reading what
+     * changed is no reason to start over.
+     */
+    class TokenRefused(cause: Throwable) : Exception(cause)
 
     fun interface Uploader {
         /** The HTTP status, or [HcSyncPlan.NO_ANSWER]. */
@@ -86,9 +94,7 @@ class HcSyncRun(
         do {
             val page = try {
                 source.changes(next)
-            } catch (_: IllegalArgumentException) {
-                null
-            } catch (_: UnsupportedOperationException) {
+            } catch (_: TokenRefused) {
                 null
             }
             if (page == null || page.expired) {

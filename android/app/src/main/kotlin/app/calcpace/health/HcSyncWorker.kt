@@ -47,6 +47,8 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Result.success()
         } catch (_: IllegalStateException) {
             Result.retry() // Health Connect's rate limit: back off
+        } catch (_: IllegalArgumentException) {
+            Result.retry() // the provider app (Android 9–13) refusing a read: later, never a dead job
         } catch (_: RemoteException) {
             Result.retry()
         } catch (_: IOException) {
@@ -69,7 +71,13 @@ class HcSyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             reader.sessionsSince(since).map { reader.facts(it) }
 
         override suspend fun changes(token: String): HcSyncRun.Changes {
-            val response = client.getChanges(token)
+            val response = try {
+                client.getChanges(token)
+            } catch (e: IllegalArgumentException) {
+                throw HcSyncRun.TokenRefused(e)
+            } catch (e: UnsupportedOperationException) {
+                throw HcSyncRun.TokenRefused(e)
+            }
             if (response.changesTokenExpired) return HcSyncRun.Changes(emptyList(), emptyList(), token, false, expired = true)
             val upserts = mutableListOf<SessionFacts>()
             val deleted = mutableListOf<String>()
