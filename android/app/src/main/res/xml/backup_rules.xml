@@ -4,4 +4,9 @@
     <exclude domain="sharedpref" path="push.xml" />
     <exclude domain="sharedpref" path="com.google.firebase.messaging.xml" />
     <exclude domain="sharedpref" path="com.google.android.gms.appid.xml" />
+    <!-- The WebView's cookies (app_webview/Default/Cookies) and storage:
+         a copied session cookie would leave two phones on one session,
+         each push registration evicting the other's token, and a sign-out
+         on one ending both. The new phone signs in again instead. -->
+    <exclude domain="root" path="app_webview" />
 </full-backup-content>
