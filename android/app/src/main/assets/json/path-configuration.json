@@ -2,7 +2,9 @@
   "settings": {},
   "rules": [
     {
-      "patterns": [".*"],
+      "patterns": [
+        ".*"
+      ],
       "properties": {
         "context": "default",
         "uri": "hotwire://fragment/web",
@@ -10,13 +12,28 @@
       }
     },
     {
-      "patterns": ["^$", "^/$", "^/[a-z]{2}(-[A-Z]{2})?/?$"],
+      "patterns": [
+        "^$",
+        "^/$",
+        "^/(en|pt\\-BR|es|de|fr|ja|it|nl|ko|sv|pl|no|zh\\-TW|hu|cs|ru)/?$"
+      ],
       "properties": {
         "presentation": "replace_root"
       }
     },
     {
-      "patterns": ["/app_auth/redeem"],
+      "patterns": [
+        "/app_auth/"
+      ],
+      "properties": {
+        "uri": "hotwire://fragment/web",
+        "pull_to_refresh_enabled": false
+      }
+    },
+    {
+      "patterns": [
+        "/app_auth/redeem"
+      ],
       "properties": {
         "presentation": "replace_root",
         "pull_to_refresh_enabled": false

@@ -27,7 +27,7 @@ class MainActivity : HotwireActivity() {
     // of at the home page. A start location never passes through the router,
     // so this is the only place a cold-start redeem is let through. Lazy so
     // the answer can't change between the two times Hotwire asks.
-    private val startLocation by lazy { locationFor(intent?.data) ?: Calcpace.baseUrl }
+    private val startLocation by lazy { locationFor(intent?.data, routed = false) ?: Calcpace.baseUrl }
 
     override fun navigatorConfigurations() = listOf(
         NavigatorConfiguration(
@@ -41,18 +41,18 @@ class MainActivity : HotwireActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         val navigator = delegate.currentNavigator ?: return
-        locationFor(intent.data)?.let { navigator.route(it) }
+        locationFor(intent.data, routed = true)?.let { navigator.route(it) }
     }
 
     /**
      * Where an incoming link should take the WebView, or null to stay put.
      * See [IncomingLink] for which links may do what.
      */
-    private fun locationFor(uri: Uri?): String? {
+    private fun locationFor(uri: Uri?, routed: Boolean): String? {
         if (uri == null) return null
 
         return when (val link = IncomingLink.classify(uri.toString(), Calcpace.baseUrl)) {
-            is IncomingLink.SignIn -> AppAuth.redeemLocation(this, link.ticket)
+            is IncomingLink.SignIn -> AppAuth.redeemLocation(this, link.ticket, routed)
             is IncomingLink.BrowserTab -> {
                 // The OAuth state this step must match lives in the tab's
                 // cookies, so it goes back there.

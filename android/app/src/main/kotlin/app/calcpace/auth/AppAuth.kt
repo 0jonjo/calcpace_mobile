@@ -26,10 +26,11 @@ import app.calcpace.Calcpace
  *    ticket and the verifier, which signs the WebView in.
  *
  * The ticket is bound to the challenge; only this app ever held the
- * verifier. The verifier is not spent on use: a bogus callback (any app can
- * send one) would otherwise wipe it before the real one arrives. The site
- * burns each ticket on first use, right or wrong, so keeping the verifier
- * until it expires gives nothing away.
+ * verifier. A callback does not spend the verifier, since a bogus one (any
+ * app can send it) would wipe it before the real one arrives; the site burns
+ * every ticket on first use, right or wrong. The verifier goes once a redeem
+ * lands somewhere other than the sign-in page ([visitCompleted]), or when it
+ * expires.
  */
 object AppAuth {
     private const val PREFS = "app_auth"
@@ -46,6 +47,12 @@ object AppAuth {
     // A redeem link arriving any other way is refused by the route handler.
     @Volatile
     private var expectedRedeem: String? = null
+
+    // A redeem was sent and its outcome is not known yet.
+    @Volatile
+    private var redeemInFlight = false
+
+    private val SIGN_IN_PAGE = Regex("^(?:/[A-Za-z]{2}(?:-[A-Za-z]{2})?)?/session(?:/new)?/?$")
 
     fun begin(activity: Activity, provider: String) {
         require(provider in providers)
@@ -69,8 +76,10 @@ object AppAuth {
     /**
      * The WebView location that completes the sign-in, or null when no
      * sign-in of ours is waiting (a stale link, or one from someone else).
+     * [routed] is true when it will go through the router (a running app),
+     * false for a cold start's first location, which never does.
      */
-    fun redeemLocation(context: Context, ticket: String): String? {
+    fun redeemLocation(context: Context, ticket: String, routed: Boolean): String? {
         val verifier = freshVerifier(context) ?: return null
 
         return Calcpace.baseUrl.toUri().buildUpon()
@@ -79,7 +88,24 @@ object AppAuth {
             .appendQueryParameter("verifier", verifier)
             .build()
             .toString()
-            .also { expectedRedeem = it }
+            .also {
+                expectedRedeem = if (routed) it else null
+                redeemInFlight = true
+            }
+    }
+
+    /**
+     * Every finished visit passes here. The first one after a redeem tells
+     * how it went: the site sends a failed redeem to the sign-in page and a
+     * good one anywhere else. Only a good one spends the verifier.
+     */
+    fun visitCompleted(context: Context, location: String) {
+        if (!redeemInFlight) return
+        val path = location.toUri().path.orEmpty()
+        if (path.contains("app_auth")) return
+
+        redeemInFlight = false
+        if (!SIGN_IN_PAGE.matches(path)) context.prefs().edit(commit = true) { clear() }
     }
 
     /** True once for the URL [redeemLocation] just built. */

@@ -36,6 +36,16 @@ class IncomingLinkTest {
         assertEquals(Ignore, classify("$base/app_auth/google"))
     }
 
+    // Round-2 review: "//app_auth/redeem" reached Rails' redeem action and
+    // slipped past an exact-path check.
+    @Test
+    fun nonCanonicalAppAuthLinksAreRefusedToo() {
+        listOf(
+            "//app_auth/redeem", "/en//app_auth/redeem", "/app_auth//redeem", "/./app_auth/redeem",
+            "/x/../app_auth/redeem", "/%2e/app_auth/redeem", "/%61pp_auth/redeem", "//app_auth/callback"
+        ).forEach { assertEquals(it, Ignore, classify("$base$it?ticket=$ticket&verifier=x")) }
+    }
+
     @Test
     fun providerStepsGoBackToTheBrowserTab() {
         val url = "$base/en/auth/strava/callback?code=1&state=2"

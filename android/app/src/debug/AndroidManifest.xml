@@ -6,7 +6,8 @@
         <activity
             android:name="app.calcpace.main.MainActivity"
             android:exported="true">
-            <intent-filter>
+            <!-- A local server can't be verified; debug builds only. -->
+            <intent-filter android:autoVerify="false">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />

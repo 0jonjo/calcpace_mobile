@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import app.calcpace.R
+import app.calcpace.auth.AppAuth
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
 import dev.hotwire.navigation.fragments.HotwireWebFragment
 
@@ -20,4 +21,9 @@ class WebFragment : HotwireWebFragment() {
         inflater.inflate(R.layout.fragment_web, container, false)
 
     override fun toolbarForNavigation(): Toolbar? = null
+
+    override fun onVisitCompleted(location: String, completedOffline: Boolean) {
+        super.onVisitCompleted(location, completedOffline)
+        AppAuth.visitCompleted(requireContext(), location)
+    }
 }
