@@ -27,7 +27,7 @@ object HcSync {
      * under way (a new link must not wait for a sync of the old one).
      */
     fun now(context: Context, replace: Boolean = false) {
-        if (HcStore(context).linkToken == null) return
+        if (HcStore.open(context).linkToken == null) return
         val request = OneTimeWorkRequestBuilder<HcSyncWorker>()
             .setConstraints(NETWORK)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
@@ -58,14 +58,14 @@ object HcSync {
 
     /** The page handed over a new link token: start over with an initial read. */
     fun linked(context: Context, token: String, background: Boolean) {
-        HcStore(context).link(token)
+        if (!HcStore.open(context).link(token)) return
         now(context, replace = true)
         if (background) schedulePeriodic(context) else cancelPeriodic(context)
     }
 
     /** Background reads allowed or not, as Health Connect says now. */
     fun backgroundChanged(context: Context, background: Boolean) {
-        if (HcStore(context).linkToken == null) return
+        if (HcStore.open(context).linkToken == null) return
         if (background) schedulePeriodic(context) else cancelPeriodic(context)
     }
 
@@ -74,6 +74,6 @@ object HcSync {
      * still the link: a sync of an old link must not undo a newer one.
      */
     fun unlink(context: Context, onlyIfLinkToken: String? = null) {
-        if (HcStore(context).clear(onlyIfLinkToken)) cancel(context)
+        if (HcStore.open(context).clear(onlyIfLinkToken)) cancel(context)
     }
 }

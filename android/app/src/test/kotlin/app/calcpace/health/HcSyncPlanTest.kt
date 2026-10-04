@@ -19,7 +19,8 @@ class HcSyncPlanTest {
             400 to After.ADVANCE, 409 to After.ADVANCE, 413 to After.ADVANCE, 422 to After.ADVANCE,
             429 to After.RETRY, 500 to After.RETRY, 502 to After.RETRY, 503 to After.RETRY,
             HcSyncPlan.NO_ANSWER to After.RETRY,
-            201 to After.RETRY, 204 to After.RETRY, 301 to After.RETRY, 403 to After.RETRY, 404 to After.RETRY,
+            201 to After.ADVANCE, 204 to After.ADVANCE, 299 to After.ADVANCE,
+            199 to After.RETRY, 301 to After.RETRY, 302 to After.RETRY, 403 to After.RETRY, 404 to After.RETRY,
         ).forEach { (status, after) -> assertEquals("$status", after, HcSyncPlan.after(status)) }
     }
 
@@ -33,7 +34,14 @@ class HcSyncPlanTest {
 
     @Test
     fun givingUpTheTokenIsSettledUnlessItIsWorthAskingAgain() {
-        listOf(204, 401, 404, 422).forEach { assertEquals("$it", true, HcSyncPlan.forgotten(it)) }
-        listOf(200, 429, 500, 503, HcSyncPlan.NO_ANSWER).forEach { assertEquals("$it", false, HcSyncPlan.forgotten(it)) }
+        listOf(200, 204, 401, 404, 422).forEach { assertEquals("$it", true, HcSyncPlan.forgotten(it)) }
+        listOf(302, 429, 500, 503, HcSyncPlan.NO_ANSWER).forEach { assertEquals("$it", false, HcSyncPlan.forgotten(it)) }
+    }
+
+    @Test
+    fun onlyHealthConnectsOwnNotFoundMeansASessionIsGone() {
+        assertEquals(true, HcSyncPlan.isNotFound("No records"))
+        listOf(null, "", "no records", "No records found", "Rate limited", "binder died")
+            .forEach { assertEquals("$it", false, HcSyncPlan.isNotFound(it)) }
     }
 }

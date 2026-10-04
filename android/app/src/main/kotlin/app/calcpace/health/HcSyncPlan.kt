@@ -25,13 +25,13 @@ object HcSyncPlan {
 
     /** What an HTTP answer means for the changes token. */
     fun after(status: Int): After = when (status) {
-        200 -> After.ADVANCE
+        in 200..299 -> After.ADVANCE
         // The link is gone (signed out, disconnected on the account page).
         401 -> After.UNLINK
         // Our own payload refused, or an account without a profile: sending
         // it again would loop for ever. The server is the judge; move on.
         400, 409, 413, 422 -> After.ADVANCE
-        // 429, 5xx, no answer: later.
+        // 429, 5xx, a redirect, no answer: later.
         else -> After.RETRY
     }
 
@@ -40,7 +40,17 @@ object HcSyncPlan {
      * that asking again won't change (401, a token the server no longer
      * knows). On 429, 5xx or no answer the app keeps its token and asks again.
      */
-    fun forgotten(status: Int): Boolean = status == 204 || (status in 400..499 && status != 429)
+    fun forgotten(status: Int): Boolean = status in 200..299 || (status in 400..499 && status != 429)
+
+    /**
+     * Whether a failed read of one session by id means it is gone. Only
+     * Health Connect's own "No records" (Android 14+) says so; anything else
+     * (IPC, quota, the provider app's errors on Android 9–13) is a hiccup: the
+     * session stays pending, bounded by HcPending's 48 hours.
+     */
+    fun isNotFound(message: String?): Boolean = message == NOT_FOUND
+
+    private const val NOT_FOUND = "No records"
 
     /** The answers of one sync's requests, sent in order until one isn't [After.ADVANCE]. */
     fun overall(afters: List<After>): After = afters.firstOrNull { it != After.ADVANCE } ?: After.ADVANCE

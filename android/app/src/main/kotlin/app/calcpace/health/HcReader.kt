@@ -32,14 +32,23 @@ class HcReader(private val client: HealthConnectClient, private val granted: Set
         return all
     }
 
-    /** The session with this id, or null once it is gone (deleted, or never readable). */
-    suspend fun session(id: String): ExerciseSessionRecord? =
+    sealed interface Read {
+        data class Found(val record: ExerciseSessionRecord) : Read
+        data object Gone : Read
+        data object Unreadable : Read
+    }
+
+    /**
+     * The session with this id. Gone only when Health Connect says there is
+     * no such record (HcSyncPlan.isNotFound); any other IPC failure leaves it
+     * for the next sync. Rate limits and permission errors still throw: they
+     * stop the whole sync.
+     */
+    suspend fun session(id: String): Read =
         try {
-            client.readRecord(ExerciseSessionRecord::class, id).record
-        } catch (_: RemoteException) {
-            null // "No records"
-        } catch (_: IllegalArgumentException) {
-            null
+            Read.Found(client.readRecord(ExerciseSessionRecord::class, id).record)
+        } catch (e: RemoteException) {
+            if (HcSyncPlan.isNotFound(e.message)) Read.Gone else Read.Unreadable
         }
 
     /** Distance, heart rate and climb of this session, from the app that recorded it only. */

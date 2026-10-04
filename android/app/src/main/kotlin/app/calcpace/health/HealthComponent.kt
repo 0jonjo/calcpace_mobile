@@ -81,7 +81,7 @@ class HealthComponent(
         // The athlete may have allowed (or stopped) background reads in
         // Health Connect's settings since the link.
         HcSync.backgroundChanged(context, background)
-        reply(message, State(HealthConnect.status(context), HcStore(context).linkToken != null, background))
+        reply(message, State(HealthConnect.status(context), HcStore.open(context).linkToken != null, background))
     }
 
     private suspend fun enable(fragment: WebFragment, message: Message) {
