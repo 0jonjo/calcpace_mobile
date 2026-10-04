@@ -35,6 +35,13 @@ object HcSyncPlan {
         else -> After.RETRY
     }
 
+    /**
+     * Whether DELETE /health_connect/token settled it: 204, or a refusal
+     * that asking again won't change (401, a token the server no longer
+     * knows). On 429, 5xx or no answer the app keeps its token and asks again.
+     */
+    fun forgotten(status: Int): Boolean = status == 204 || (status in 400..499 && status != 429)
+
     /** The answers of one sync's requests, sent in order until one isn't [After.ADVANCE]. */
     fun overall(afters: List<After>): After = afters.firstOrNull { it != After.ADVANCE } ?: After.ADVANCE
 }

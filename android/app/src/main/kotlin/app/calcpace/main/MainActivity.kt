@@ -11,6 +11,7 @@ import androidx.core.view.WindowInsetsCompat
 import app.calcpace.Calcpace
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
+import app.calcpace.health.HcSync
 import dev.hotwire.navigation.activities.HotwireActivity
 import dev.hotwire.navigation.navigator.NavigatorConfiguration
 
@@ -21,6 +22,14 @@ class MainActivity : HotwireActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         keepClearOfSystemBars(findViewById(R.id.root))
+    }
+
+    // Health Connect runs arrive whenever the app comes to the foreground,
+    // the only way they do when background reads aren't allowed. Nothing
+    // happens on a phone that hasn't linked Health Connect.
+    override fun onStart() {
+        super.onStart()
+        HcSync.now(this)
     }
 
     // A cold start from a link or from a finished sign-in begins there instead

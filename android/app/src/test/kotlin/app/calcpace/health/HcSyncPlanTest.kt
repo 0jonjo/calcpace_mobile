@@ -30,4 +30,10 @@ class HcSyncPlanTest {
         assertEquals(After.RETRY, HcSyncPlan.overall(listOf(After.ADVANCE, After.RETRY)))
         assertEquals(After.UNLINK, HcSyncPlan.overall(listOf(After.UNLINK, After.RETRY)))
     }
+
+    @Test
+    fun givingUpTheTokenIsSettledUnlessItIsWorthAskingAgain() {
+        listOf(204, 401, 404, 422).forEach { assertEquals("$it", true, HcSyncPlan.forgotten(it)) }
+        listOf(200, 429, 500, 503, HcSyncPlan.NO_ANSWER).forEach { assertEquals("$it", false, HcSyncPlan.forgotten(it)) }
+    }
 }
