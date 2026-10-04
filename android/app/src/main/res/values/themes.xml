@@ -1,0 +1,15 @@
+<resources>
+    <style name="Theme.Calcpace" parent="Theme.Material3.Light.NoActionBar">
+        <item name="colorPrimary">@color/calcpace_green</item>
+        <item name="colorSurface">@color/background</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+    <style name="Theme.Calcpace.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/background</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Calcpace</item>
+    </style>
+</resources>

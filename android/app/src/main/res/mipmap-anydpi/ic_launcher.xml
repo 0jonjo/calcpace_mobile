@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same icon as the TWA build: the maskable artwork on white, inset the way
+     Chrome's WebAPKs inset it. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background>
+        <layer-list>
+            <item android:drawable="@android:color/white" />
+            <item
+                android:bottom="8.5dp"
+                android:drawable="@mipmap/ic_maskable"
+                android:left="8.5dp"
+                android:right="8.5dp"
+                android:top="8.5dp" />
+        </layer-list>
+    </background>
+    <foreground android:drawable="@android:color/transparent" />
+</adaptive-icon>

@@ -1,0 +1,5 @@
+<resources>
+    <!-- The site's theme color (site.webmanifest). -->
+    <color name="calcpace_green">#10B981</color>
+    <color name="background">#FFFFFF</color>
+</resources>

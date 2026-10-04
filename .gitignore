@@ -1,0 +1,21 @@
+# Gradle / Android
+.gradle/
+build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Signing material never lives in the repo
+*.keystore
+*.jks
+signing.properties
+
+# IDEs and OS
+.idea/
+*.iml
+.DS_Store
+
+# Xcode (ios/, later)
+xcuserdata/
+DerivedData/

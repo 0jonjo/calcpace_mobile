@@ -1,0 +1,26 @@
+{
+  "settings": {},
+  "rules": [
+    {
+      "patterns": [".*"],
+      "properties": {
+        "context": "default",
+        "uri": "hotwire://fragment/web",
+        "pull_to_refresh_enabled": true
+      }
+    },
+    {
+      "patterns": ["^$", "^/$", "^/[a-z]{2}(-[A-Z]{2})?/?$"],
+      "properties": {
+        "presentation": "clear_all"
+      }
+    },
+    {
+      "patterns": ["/app_auth/redeem"],
+      "properties": {
+        "presentation": "replace_root",
+        "pull_to_refresh_enabled": false
+      }
+    }
+  ]
+}
