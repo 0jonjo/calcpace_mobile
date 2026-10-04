@@ -23,8 +23,8 @@ object PushPayload {
     private const val MAX_PATH = 2048
 
     fun parse(data: Map<String, String>, baseUrl: String): Notice? {
-        val title = data["title"]?.trim()?.take(MAX_TEXT).orEmpty()
-        val body = data["body"]?.trim()?.take(MAX_TEXT).orEmpty()
+        val title = data["title"]?.trim()?.cut().orEmpty()
+        val body = data["body"]?.trim()?.cut().orEmpty()
         val path = data["path"] ?: return null
         if (title.isEmpty() || body.isEmpty() || !isPlainPath(path)) return null
 
@@ -33,6 +33,13 @@ object PushPayload {
             is IncomingLink.Web -> Notice(title, body, url)
             else -> null
         }
+    }
+
+    // At most MAX_TEXT chars, never half of a surrogate pair (an emoji).
+    private fun String.cut(): String {
+        if (length <= MAX_TEXT) return this
+        val end = if (Character.isHighSurrogate(this[MAX_TEXT - 1])) MAX_TEXT - 1 else MAX_TEXT
+        return substring(0, end)
     }
 
     // "/x", never "//host", "/\host", a scheme, or anything the WebView would

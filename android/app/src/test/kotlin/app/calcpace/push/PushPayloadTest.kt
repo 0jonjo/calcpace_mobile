@@ -76,4 +76,15 @@ class PushPayloadTest {
     fun anOverlongPathIsRefused() {
         assertNull(PushPayload.parse(data(path = "/" + "a".repeat(2048)), base))
     }
+
+    // An emoji is two UTF-16 chars; cutting between them leaves a broken
+    // character in the notification.
+    @Test
+    fun cuttingNeverSplitsASurrogatePair() {
+        val emoji = "\uD83C\uDFC3" // runner
+        val notice = PushPayload.parse(data(title = "a".repeat(199) + emoji, body = emoji.repeat(150)), base)!!
+        assertEquals("a".repeat(199), notice.title)
+        assertEquals(emoji.repeat(100), notice.body)
+        assertEquals(200, notice.body.length)
+    }
 }
