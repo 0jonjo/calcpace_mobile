@@ -1,7 +1,9 @@
 package app.calcpace.web
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,7 +11,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.Toolbar
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
+import app.calcpace.push.PendingCallbacks
+import app.calcpace.push.PermissionPrompt
 import app.calcpace.push.Push
+import app.calcpace.push.PushStatus
 import dev.hotwire.core.turbo.errors.VisitError
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
 import dev.hotwire.navigation.fragments.HotwireWebFragment
@@ -21,12 +26,24 @@ import dev.hotwire.navigation.fragments.HotwireWebFragment
  */
 @HotwireDestinationDeepLink(uri = "hotwire://fragment/web")
 class WebFragment : HotwireWebFragment() {
-    private var onNotificationPermission: ((Boolean) -> Unit)? = null
+    private val notificationCallbacks = PendingCallbacks<Boolean>()
+    private var rationaleBeforePrompt = false
+    private var promptStartedAt = 0L
 
     private val notificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            onNotificationPermission?.invoke(granted)
-            onNotificationPermission = null
+            // Only launched on Android 13+, where the permission exists.
+            val context = context
+            if (context != null && Build.VERSION.SDK_INT >= PushStatus.RUNTIME_PERMISSION_SDK) {
+                val outcome = PermissionPrompt.outcome(
+                    granted = granted,
+                    rationaleBefore = rationaleBeforePrompt,
+                    rationaleAfter = shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS),
+                    elapsedMs = SystemClock.elapsedRealtime() - promptStartedAt,
+                )
+                Push.promptFinished(context, outcome)
+            }
+            notificationCallbacks.resolve(granted)
         }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
@@ -47,13 +64,14 @@ class WebFragment : HotwireWebFragment() {
     /**
      * Shows the system's notification prompt for the push bridge component.
      * Answers at once where there is nothing to ask: Android 12 and older, or
-     * a permission granted before.
+     * a permission granted before. A second call while the prompt is up waits
+     * for the same answer instead of launching again.
      */
     fun requestNotificationPermission(callback: (Boolean) -> Unit) {
-        val context = requireContext()
-        if (Push.isPermissionGranted(context)) return callback(true)
-        onNotificationPermission = callback
-        Push.markAsked(context)
+        if (Push.isPermissionGranted(requireContext())) return callback(true)
+        if (!notificationCallbacks.enqueue(callback)) return
+        rationaleBeforePrompt = shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+        promptStartedAt = SystemClock.elapsedRealtime()
         notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 }

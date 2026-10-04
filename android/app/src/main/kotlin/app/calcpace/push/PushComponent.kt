@@ -45,7 +45,7 @@ class PushComponent(
         val fragment = fragment ?: return
         val status = Push.currentStatus(fragment)
         if (status != PushStatus.GRANTED) return reply(message, Reply(status))
-        Push.fetchToken { token ->
+        Push.fetchToken(fragment.requireContext()) { token ->
             if (this.fragment != null) reply(message, Reply(status, token))
         }
     }

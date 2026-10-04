@@ -19,16 +19,22 @@ import com.google.firebase.messaging.FirebaseMessaging
  */
 object Push {
     private const val PREFS = "push"
-    private const val KEY_ASKED = "asked"
     private const val KEY_OPTED_IN = "opted_in"
+    private const val KEY_BLOCKED = "blocked"
+    private const val KEY_HAS_TOKEN = "has_token"
 
-    /** Builds without google-services.json (CI) have empty options. */
-    val isConfigured: Boolean = listOf(
+    /**
+     * Builds without google-services.json (CI) have empty options, and a
+     * ".debug" package isn't the app those options belong to: both run with
+     * push off.
+     */
+    val isConfigured: Boolean = PushStatus.isConfigured(
+        BuildConfig.APPLICATION_ID,
         BuildConfig.FIREBASE_PROJECT_ID,
         BuildConfig.FIREBASE_SENDER_ID,
         BuildConfig.FIREBASE_APP_ID,
         BuildConfig.FIREBASE_API_KEY,
-    ).all { it.isNotEmpty() }
+    )
 
     /** From Application.onCreate. There is no google-services plugin, so the options are built by hand. */
     fun init(context: Context) {
@@ -44,26 +50,44 @@ object Push {
         )
     }
 
+    /**
+     * The status for the bridge. An opted-in phone that has lost permission
+     * drops its token here, once (see [PushStatus.shouldDropToken]).
+     */
     fun currentStatus(fragment: Fragment): String {
         val context = fragment.requireContext()
-        val runtimePermission = Build.VERSION.SDK_INT >= PushStatus.RUNTIME_PERMISSION_SDK
-        return PushStatus.of(
+        val prefs = prefs(context)
+        val granted = Build.VERSION.SDK_INT >= PushStatus.RUNTIME_PERMISSION_SDK && isPermissionGranted(context)
+        // The system grants again (say, from settings): nothing is blocked.
+        if (granted && prefs.getBoolean(KEY_BLOCKED, false)) prefs.edit { putBoolean(KEY_BLOCKED, false) }
+
+        val optedIn = prefs.getBoolean(KEY_OPTED_IN, false)
+        val status = PushStatus.of(
             configured = isConfigured,
             sdkInt = Build.VERSION.SDK_INT,
-            optedIn = prefs(context).getBoolean(KEY_OPTED_IN, false),
-            granted = runtimePermission && isPermissionGranted(context),
+            optedIn = optedIn,
+            granted = granted,
             notificationsEnabled = RunNotifications.areEnabled(context),
-            askedBefore = prefs(context).getBoolean(KEY_ASKED, false),
-            canAskAgain = runtimePermission &&
-                fragment.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS),
+            blocked = prefs.getBoolean(KEY_BLOCKED, false),
         )
+        if (PushStatus.shouldDropToken(optedIn, status) && prefs.getBoolean(KEY_HAS_TOKEN, false)) {
+            dropToken(context)
+        }
+        return status
     }
 
     /** The athlete tapped "turn on". */
     fun optIn(context: Context) = prefs(context).edit { putBoolean(KEY_OPTED_IN, true) }
 
-    /** The system prompt is about to show. */
-    fun markAsked(context: Context) = prefs(context).edit { putBoolean(KEY_ASKED, true) }
+    /** Records what a run of the system prompt says about asking again. */
+    fun promptFinished(context: Context, outcome: PermissionPrompt.Outcome) {
+        when (outcome) {
+            PermissionPrompt.Outcome.BLOCKED -> prefs(context).edit { putBoolean(KEY_BLOCKED, true) }
+            PermissionPrompt.Outcome.GRANTED,
+            PermissionPrompt.Outcome.CAN_ASK_AGAIN -> prefs(context).edit { putBoolean(KEY_BLOCKED, false) }
+            PermissionPrompt.Outcome.DISMISSED -> Unit
+        }
+    }
 
     fun isPermissionGranted(context: Context): Boolean =
         Build.VERSION.SDK_INT < PushStatus.RUNTIME_PERMISSION_SDK ||
@@ -75,12 +99,23 @@ object Push {
      * over the token, or null if FCM couldn't get one. Calls back on the main
      * thread.
      */
-    fun fetchToken(callback: (String?) -> Unit) {
+    fun fetchToken(context: Context, callback: (String?) -> Unit) {
+        val appContext = context.applicationContext
         val messaging = runCatching { FirebaseMessaging.getInstance() }.getOrNull() ?: return callback(null)
         messaging.isAutoInitEnabled = true
         messaging.token.addOnCompleteListener { task ->
-            callback(if (task.isSuccessful) task.result else null)
+            val token = if (task.isSuccessful) task.result else null
+            if (token != null) prefs(appContext).edit { putBoolean(KEY_HAS_TOKEN, true) }
+            callback(token)
         }
+    }
+
+    // Auto-init goes off first, or FCM would mint a new token on its own.
+    private fun dropToken(context: Context) {
+        val messaging = runCatching { FirebaseMessaging.getInstance() }.getOrNull() ?: return
+        prefs(context).edit { putBoolean(KEY_HAS_TOKEN, false) }
+        messaging.isAutoInitEnabled = false
+        messaging.deleteToken()
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
