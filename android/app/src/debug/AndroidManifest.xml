@@ -2,6 +2,15 @@
 <!-- Debug builds may point at a local Rails server over plain HTTP, and
      accept that server's links the way release accepts calcpace.app's. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- HcSeedActivity writes made-up runs to Health Connect for testing
+         the import on an emulator. Debug builds only: a release build never
+         asks to write anything. -->
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+    <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
+    <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.WRITE_ELEVATION_GAINED" />
+
     <application android:usesCleartextTraffic="true">
         <activity
             android:name="app.calcpace.main.MainActivity"
@@ -16,5 +25,13 @@
                     android:scheme="${debugSiteScheme}" />
             </intent-filter>
         </activity>
+
+        <!-- Seeds Health Connect from adb shell am start; the commands are in
+             HcSeedActivity and the README. Launched by adb only. -->
+        <activity
+            android:name="app.calcpace.health.HcSeedActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
     </application>
 </manifest>
