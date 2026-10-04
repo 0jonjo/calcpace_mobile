@@ -28,8 +28,14 @@ class HcLinkGate(
     private var grant: String? = null
     private var openedAt = 0L
 
-    /** The athlete just allowed the import on this page: the grant the "enable" reply carries. */
+    /**
+     * The athlete just allowed the import on this page: the grant the
+     * "enable" reply carries. While one is still open (unused, unexpired) it
+     * is handed out again, so a second "enable" (a double tap) doesn't void
+     * the first one's grant; a new one only after a link, a close or expiry.
+     */
     fun open(): String {
+        grant?.takeIf { clock() - openedAt in 0..WINDOW_MS }?.let { return it }
         val bytes = ByteArray(GRANT_BYTES).also(random)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes).also {
             grant = it

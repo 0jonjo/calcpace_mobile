@@ -46,15 +46,37 @@ class HcLinkGateTest {
     }
 
     @Test
-    fun onlyTheLatestGrantCounts() {
+    fun aSecondEnableGetsTheSameGrantWhileItIsOpen() {
         val first = gate.open()
-        val second = gate.open()
-        assertNotEquals(first, second)
-        assertFalse(gate.consume(first))
-        assertFalse(gate.consume(second)) // the wrong one closed it
+        now += HcLinkGate.WINDOW_MS
+        assertEquals(first, gate.open())
+        assertTrue(gate.consume(first))
+    }
 
-        val third = gate.open()
-        assertTrue(gate.consume(third))
+    @Test
+    fun aNewGrantOnlyAfterTheOldOneIsUsedClosedOrExpired() {
+        val used = gate.open()
+        assertTrue(gate.consume(used))
+        val afterUse = gate.open()
+        assertNotEquals(used, afterUse)
+
+        assertFalse(gate.consume("wrong"))
+        val afterClose = gate.open()
+        assertNotEquals(afterUse, afterClose)
+
+        now += HcLinkGate.WINDOW_MS + 1
+        val afterExpiry = gate.open()
+        assertNotEquals(afterClose, afterExpiry)
+        assertFalse(gate.consume(afterClose))
+    }
+
+    @Test
+    fun theReusedGrantKeepsItsFirstDeadline() {
+        val grant = gate.open()
+        now += HcLinkGate.WINDOW_MS - 1
+        gate.open()
+        now += 2
+        assertFalse(gate.consume(grant))
     }
 
     @Test
