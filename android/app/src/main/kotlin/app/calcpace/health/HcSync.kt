@@ -8,8 +8,14 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * When the import runs. A sync whenever the app comes to the foreground
@@ -20,21 +26,32 @@ object HcSync {
     private const val NOW = "hc-sync-now"
     private const val PERIODIC = "hc-sync"
 
+    /** Off the main thread: asking WorkManager what is queued reads its database. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private val NETWORK = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
 
     /**
-     * One sync as soon as there is a network. [replace] cancels one already
-     * under way (a new link must not wait for a sync of the old one).
+     * One sync as soon as there is a network. One waiting (say, in a retry's
+     * backoff) is replaced, so coming back to the app syncs now; one already
+     * running is left to finish, unless [replace] (a new link must not wait
+     * for a sync of the old one).
      */
     fun now(context: Context, replace: Boolean = false) {
         if (HcStore.open(context).linkToken == null) return
+        val workManager = WorkManager.getInstance(context)
         val request = OneTimeWorkRequestBuilder<HcSyncWorker>()
             .setConstraints(NETWORK)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            NOW, if (replace) ExistingWorkPolicy.REPLACE else ExistingWorkPolicy.KEEP, request
-        )
+        if (replace) {
+            workManager.enqueueUniqueWork(NOW, ExistingWorkPolicy.REPLACE, request)
+            return
+        }
+        scope.launch {
+            val running = workManager.getWorkInfosForUniqueWorkFlow(NOW).first().any { it.state == WorkInfo.State.RUNNING }
+            workManager.enqueueUniqueWork(NOW, if (running) ExistingWorkPolicy.KEEP else ExistingWorkPolicy.REPLACE, request)
+        }
     }
 
     fun schedulePeriodic(context: Context) {
