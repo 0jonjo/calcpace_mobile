@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">러닝</string>
     <string name="channel_runs_description">러닝 기록이 Calcpace에 도착하면</string>
+    <string name="hc_link_confirm_title">Health Connect에서 러닝 기록을 가져올까요?</string>
+    <string name="hc_link_confirm_body">Calcpace가 Health Connect의 러닝과 걷기 기록을 읽어 로그인한 계정에 추가합니다.</string>
+    <string name="hc_link_confirm_ok">가져오기</string>
 </resources>

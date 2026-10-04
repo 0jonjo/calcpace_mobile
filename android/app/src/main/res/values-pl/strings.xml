@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Biegi</string>
     <string name="channel_runs_description">Gdy Twój bieg trafi do Calcpace</string>
+    <string name="hc_link_confirm_title">Zaimportować biegi z Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace odczyta Twoje biegi i spacery z Health Connect i doda je do konta, na które jesteś zalogowany.</string>
+    <string name="hc_link_confirm_ok">Importuj</string>
 </resources>

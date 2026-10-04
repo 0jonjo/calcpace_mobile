@@ -5,4 +5,12 @@
          settings list it. "Run" is any run, not a race. -->
     <string name="channel_runs_name">Runs</string>
     <string name="channel_runs_description">When your run arrives in Calcpace</string>
+
+    <!-- Asked before linking Health Connect when its permissions were
+         granted before, so no Health Connect screen shows: a page can't
+         link this phone to an account without the athlete saying so. In
+         pt-BR the system calls Health Connect "Conexão Saúde". -->
+    <string name="hc_link_confirm_title">Import runs from Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace will read your runs and walks from Health Connect and add them to the account you are signed in to.</string>
+    <string name="hc_link_confirm_ok">Import</string>
 </resources>

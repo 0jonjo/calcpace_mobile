@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Пробежки</string>
     <string name="channel_runs_description">Когда ваша пробежка появляется в Calcpace</string>
+    <string name="hc_link_confirm_title">Импортировать пробежки из Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace прочитает ваши пробежки и прогулки из Health Connect и добавит их в аккаунт, в который вы вошли.</string>
+    <string name="hc_link_confirm_ok">Импортировать</string>
 </resources>

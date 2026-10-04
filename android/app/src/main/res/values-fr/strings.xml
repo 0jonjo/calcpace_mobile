@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Courses</string>
     <string name="channel_runs_description">Quand votre course arrive dans Calcpace</string>
+    <string name="hc_link_confirm_title">Importer les courses depuis Health Connect ?</string>
+    <string name="hc_link_confirm_body">Calcpace lira vos courses et marches dans Health Connect et les ajoutera au compte auquel vous êtes connecté.</string>
+    <string name="hc_link_confirm_ok">Importer</string>
 </resources>

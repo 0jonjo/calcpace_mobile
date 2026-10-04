@@ -9,7 +9,9 @@ import dev.hotwire.core.bridge.BridgeDelegate
 import dev.hotwire.core.bridge.Message
 import dev.hotwire.navigation.destinations.HotwireDestination
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.Serializable
 
 /**
@@ -21,9 +23,11 @@ import kotlinx.serialization.Serializable
  *   Never asks anything.
  * - "enable" `{}` → `{ status, granted, background }`, after Health
  *   Connect's permission screen (or Play's page, when Health Connect needs
- *   installing or updating). `granted` = exercise and distance allowed.
+ *   installing or updating). `granted` = exercise and distance allowed and,
+ *   when they had been allowed before, the athlete confirmed in the app.
  * - "link" `{ token }` → `{ linked }`: the token the page got from
- *   POST /health_connect/link; the app keeps it and starts syncing.
+ *   POST /health_connect/link; the app keeps it and starts syncing. Only
+ *   right after a granted "enable" on this page ([HcLinkGate]).
  * - "unlink" `{}` → `{ linked: false }`: the server no longer has this
  *   session's link, so the app forgets its token too.
  *
@@ -34,6 +38,8 @@ class HealthComponent(
     name: String,
     private val bridgeDelegate: BridgeDelegate<HotwireDestination>,
 ) : BridgeComponent<HotwireDestination>(name, bridgeDelegate) {
+
+    private val linkGate = HcLinkGate()
 
     private val fragment: WebFragment?
         get() = (bridgeDelegate.destination.fragment as? WebFragment)?.takeIf { it.isAdded }
@@ -58,14 +64,16 @@ class HealthComponent(
      * it is unavailable instead of the app crashing.
      */
     private fun WebFragment.guarded(message: Message, block: suspend () -> Unit) {
+        val context = requireContext().applicationContext
         lifecycleScope.launch {
             try {
                 block()
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
+                val linked = HcStore.open(context).linkToken != null
                 when (message.event) {
-                    "connect" -> reply(message, State(HcStatus.UNAVAILABLE, linked = false, background = false))
+                    "connect" -> reply(message, State(HcStatus.UNAVAILABLE, linked = linked, background = false))
                     "enable" -> reply(message, Enabled(HcStatus.UNAVAILABLE, granted = false, background = false))
                     "link" -> reply(message, Linked(false))
                 }
@@ -75,13 +83,14 @@ class HealthComponent(
 
     private suspend fun connect(fragment: WebFragment, message: Message) {
         val context = fragment.requireContext()
+        val linked = HcStore.open(context).linkToken != null
         val client = HealthConnect.client(context)
         val background = client != null &&
             HealthConnect.backgroundGranted(client, client.permissionController.getGrantedPermissions())
         // The athlete may have allowed (or stopped) background reads in
         // Health Connect's settings since the link.
         HcSync.backgroundChanged(context, background)
-        reply(message, State(HealthConnect.status(context), HcStore.open(context).linkToken != null, background))
+        reply(message, State(HealthConnect.status(context), linked, background))
     }
 
     private suspend fun enable(fragment: WebFragment, message: Message) {
@@ -94,15 +103,24 @@ class HealthComponent(
         }
         val toRequest = HealthConnect.toRequest(client)
         val before = client.permissionController.getGrantedPermissions()
-        if (before.containsAll(toRequest)) return reply(message, enabled(client, before))
-
-        fragment.requestHealthPermissions(toRequest) {
-            // Read back what Health Connect holds now, whatever the screen
-            // reported: the athlete can only have changed it there.
-            fragment.guarded(message) {
-                reply(message, enabled(client, client.permissionController.getGrantedPermissions()))
-            }
+        // Read back what Health Connect holds after its screen, whatever the
+        // screen reported: the athlete can only have changed it there.
+        val after = if (before.containsAll(toRequest)) before else {
+            suspendCancellableCoroutine { done -> fragment.requestHealthPermissions(toRequest) { done.resume(Unit) } }
+            client.permissionController.getGrantedPermissions()
         }
+        val answer = enabled(client, after)
+        if (!answer.granted) return reply(message, answer)
+
+        // Allowed before: Health Connect may have shown nothing at all, so the
+        // yes has to come from the athlete here (HcLinkGate).
+        val confirmed = if (before.containsAll(HealthConnect.REQUIRED)) {
+            suspendCancellableCoroutine { done -> fragment.confirmHealthLink { done.resume(it) } }
+        } else {
+            true
+        }
+        if (confirmed) linkGate.open()
+        reply(message, answer.copy(granted = confirmed))
     }
 
     private fun enabled(client: HealthConnectClient, granted: Set<String>) =
@@ -113,8 +131,10 @@ class HealthComponent(
         )
 
     private suspend fun link(fragment: WebFragment, message: Message) {
-        val token = HcPayload.linkTokenFrom(message.jsonData) ?: return reply(message, Linked(false))
         val context = fragment.requireContext()
+        // One link per yes, whatever the token turns out to be.
+        if (!linkGate.consume()) return reply(message, Linked(false))
+        val token = HcPayload.linkTokenFrom(message.jsonData) ?: return reply(message, Linked(false))
         val client = HealthConnect.client(context)
         val background = client != null &&
             HealthConnect.backgroundGranted(client, client.permissionController.getGrantedPermissions())

@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">ランニング</string>
     <string name="channel_runs_description">ランニングが Calcpace に届いたとき</string>
+    <string name="hc_link_confirm_title">Health Connect からランニングを取り込みますか？</string>
+    <string name="hc_link_confirm_body">Calcpace は Health Connect のランニングとウォーキングを読み取り、ログイン中のアカウントに追加します。</string>
+    <string name="hc_link_confirm_ok">取り込む</string>
 </resources>

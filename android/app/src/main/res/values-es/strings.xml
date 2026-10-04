@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Carreras</string>
     <string name="channel_runs_description">Cuando tu carrera llega a Calcpace</string>
+    <string name="hc_link_confirm_title">¿Importar carreras de Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace leerá tus carreras y caminatas de Health Connect y las añadirá a la cuenta con la que iniciaste sesión.</string>
+    <string name="hc_link_confirm_ok">Importar</string>
 </resources>

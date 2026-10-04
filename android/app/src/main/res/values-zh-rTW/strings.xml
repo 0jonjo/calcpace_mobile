@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">跑步</string>
     <string name="channel_runs_description">你的跑步紀錄抵達 Calcpace 時</string>
+    <string name="hc_link_confirm_title">要從 Health Connect 匯入跑步紀錄嗎？</string>
+    <string name="hc_link_confirm_body">Calcpace 會讀取 Health Connect 中的跑步和步行紀錄，並加入你目前登入的帳號。</string>
+    <string name="hc_link_confirm_ok">匯入</string>
 </resources>

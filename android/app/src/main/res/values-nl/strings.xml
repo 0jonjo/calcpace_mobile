@@ -2,4 +2,7 @@
 <resources>
     <string name="channel_runs_name">Runs</string>
     <string name="channel_runs_description">Wanneer je run in Calcpace binnenkomt</string>
+    <string name="hc_link_confirm_title">Runs importeren uit Health Connect?</string>
+    <string name="hc_link_confirm_body">Calcpace leest je runs en wandelingen uit Health Connect en voegt ze toe aan het account waarmee je bent ingelogd.</string>
+    <string name="hc_link_confirm_ok">Importeren</string>
 </resources>

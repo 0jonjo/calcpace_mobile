@@ -17,6 +17,7 @@ import app.calcpace.push.PendingCallbacks
 import app.calcpace.push.PermissionPrompt
 import app.calcpace.push.Push
 import app.calcpace.push.PushStatus
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.hotwire.core.turbo.errors.VisitError
 import dev.hotwire.core.turbo.webview.HotwireWebView
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
@@ -55,6 +56,7 @@ class WebFragment : HotwireWebFragment() {
         }
 
     private val healthCallbacks = PendingCallbacks<Set<String>>()
+    private val healthConfirmations = PendingCallbacks<Boolean>()
     private val healthPermissions =
         registerForActivityResult(PermissionController.createRequestPermissionResultContract()) { granted ->
             healthCallbacks.resolve(granted)
@@ -111,5 +113,22 @@ class WebFragment : HotwireWebFragment() {
         } catch (_: ActivityNotFoundException) {
             healthCallbacks.resolve(emptySet()) // Health Connect went away meanwhile
         }
+    }
+
+    /**
+     * Asks the athlete to confirm linking Health Connect to the signed-in
+     * account, for when Health Connect has nothing left to ask (see
+     * HcLinkGate). One dialog at a time; every caller gets its answer.
+     */
+    fun confirmHealthLink(callback: (Boolean) -> Unit) {
+        if (!healthConfirmations.enqueue(callback)) return
+        var answer = false
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.hc_link_confirm_title)
+            .setMessage(R.string.hc_link_confirm_body)
+            .setPositiveButton(R.string.hc_link_confirm_ok) { _, _ -> answer = true }
+            .setNegativeButton(android.R.string.cancel, null)
+            .setOnDismissListener { healthConfirmations.resolve(answer) }
+            .show()
     }
 }
