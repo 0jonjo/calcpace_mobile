@@ -70,6 +70,7 @@ Ordered by impact for effort.
    - `L`: the app holds a link token. `B`: background reads exist on the phone and are allowed. `G`: `READ_EXERCISE` and `READ_DISTANCE` allowed (heart rate and climb are optional).
    - `T`: 43 base64url characters; the app refuses anything else.
    - Only the home (`/`, `/<locale>`) and the account page (`/account`, `/<locale>/account`) may drive it.
+   - `link` is only taken within 5 minutes of an `enable` on the same page that answered `granted: true`, once per `enable` (any frame of a page can reach the bridge). When exercise and distance were allowed before, Health Connect may show nothing, so the app asks for a native confirmation before answering `granted: true`; "Cancel" answers `granted: false`. Outside that window `link` answers `{ "linked": false }`.
    - The page, on `enable` with `granted: true`, posts to `/health_connect/link` (cookie + CSRF), gets `{ "token": T }`, sends `link`, and reloads on `{ "linked": true }`. If `L` is true and the server has no link for this session, it sends `unlink`.
 
    Upload (app → server): `POST /health_connect/sessions`, `Authorization: Bearer T`, JSON, at most 50 sessions and 200 deleted ids per request:
@@ -85,8 +86,8 @@ Ordered by impact for effort.
    ```
 
    - `duration_s` is active time (pauses and rests taken off); `title`, `device`, `zone_offset`, `hr_*` and `elevation_gain_m` are left out when unknown.
-   - The first sync sends the last 30 days with `initial: true` (never notified). The changes token is taken before that read and only moves on once every request of a sync got 200 (or 400/409/413/422: the server's final word on our payload). 429, 5xx and network errors retry with backoff; 401 makes the app forget its token and stop.
-   - A session with no distance yet is re-read by id on later syncs and given up after 48 h. Deleted ids all go (Health Connect doesn't say what they were).
+   - The first sync sends the last 30 days with `initial: true` (never notified). The changes token is taken before that read and only moves on once every request of a sync got a 2xx (or 400/409/413/422: the server's final word on our payload). A changes token Health Connect expires or refuses means the 30-day read again. 429, 5xx and network errors retry with backoff; 401 makes the app forget its token and stop.
+   - A session with no distance yet is re-read by id on later syncs and given up after 48 h; a read that fails for any reason other than "not found" keeps it pending. Deleted ids all go (Health Connect doesn't say what they were).
    - `DELETE /health_connect/token` (Bearer) → 204: the app gives the link up when exercise or distance permission is revoked in Health Connect.
    - Known limit: apps that don't write pause segments (likely Garmin) get elapsed time, not moving time.
 4. **Home screen widget:** the week's distance and runs, and the next race.
