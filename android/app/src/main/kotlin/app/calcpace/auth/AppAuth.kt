@@ -52,8 +52,6 @@ object AppAuth {
     @Volatile
     private var redeemInFlight = false
 
-    private val SIGN_IN_PAGE = Regex("^(?:/[A-Za-z]{2}(?:-[A-Za-z]{2})?)?/session(?:/new)?/?$")
-
     fun begin(activity: Activity, provider: String) {
         require(provider in providers)
 
@@ -101,11 +99,15 @@ object AppAuth {
      */
     fun visitCompleted(context: Context, location: String) {
         if (!redeemInFlight) return
-        val path = location.toUri().path.orEmpty()
-        if (path.contains("app_auth")) return
+        val succeeded = AppAuthPaths.redeemSucceeded(location) ?: return
 
         redeemInFlight = false
-        if (!SIGN_IN_PAGE.matches(path)) context.prefs().edit(commit = true) { clear() }
+        if (succeeded) context.prefs().edit(commit = true) { clear() }
+    }
+
+    /** A redeem that never got an answer keeps the verifier for a retry. */
+    fun visitFailed() {
+        redeemInFlight = false
     }
 
     /** True once for the URL [redeemLocation] just built. */

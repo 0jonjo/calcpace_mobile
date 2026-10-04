@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.appcompat.widget.Toolbar
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
+import dev.hotwire.core.turbo.errors.VisitError
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
 import dev.hotwire.navigation.fragments.HotwireWebFragment
 
@@ -25,5 +26,10 @@ class WebFragment : HotwireWebFragment() {
     override fun onVisitCompleted(location: String, completedOffline: Boolean) {
         super.onVisitCompleted(location, completedOffline)
         AppAuth.visitCompleted(requireContext(), location)
+    }
+
+    override fun onVisitErrorReceived(location: String, error: VisitError) {
+        super.onVisitErrorReceived(location, error)
+        AppAuth.visitFailed()
     }
 }

@@ -39,10 +39,39 @@ class AppAuthPathTest {
         ).forEach { assertTrue(it, AppAuthPaths.isGuarded("$site$it?ticket=a&verifier=b", host)) }
     }
 
+    // Round-3 review: java.net.URI refuses these, the WebView follows them.
+    // A guard that gives up on what it can't parse would wave them through.
+    @Test
+    fun urlsJavaNetUriCannotParseAreStillGuarded() {
+        listOf("#%zz", "#|", "&x=|", "&x={}", "&x=%", "#^")
+            .forEach { assertTrue(it, AppAuthPaths.isGuarded("$site/app_auth/redeem?ticket=a&verifier=b$it", host)) }
+        assertTrue(AppAuthPaths.isRedeem("$site/app_auth/redeem?ticket=a&verifier=b#%zz"))
+        assertTrue(AppAuthPaths.isGuarded("not a url at all", host))
+        assertTrue(AppAuthPaths.isGuarded("$site/%zz%61pp_auth/redeem", host))
+    }
+
+    @Test
+    fun malformedEscapesDoNotCrashOrDecodeWrongly() {
+        assertFalse(AppAuthPaths.isGuarded("$site/%+1app/%-1", host))
+        assertTrue(AppAuthPaths.isGuarded("$site/%41PP_AUTH/redeem", host))
+        assertFalse(AppAuthPaths.isGuarded("$site/news/100%", host))
+    }
+
+    @Test
+    fun aRedeemIsJudgedByWhereItLands() {
+        assertEquals(null, AppAuthPaths.redeemSucceeded("$site/app_auth/redeem?ticket=a"))
+        assertEquals(false, AppAuthPaths.redeemSucceeded("$site/pt-BR/session/new"))
+        assertEquals(false, AppAuthPaths.redeemSucceeded("$site/session/new"))
+        assertEquals(true, AppAuthPaths.redeemSucceeded("$site/"))
+        assertEquals(true, AppAuthPaths.redeemSucceeded("$site/profile/new"))
+        assertEquals(true, AppAuthPaths.redeemSucceeded("$site/pt-BR/activities"))
+    }
+
     @Test
     fun guardingIsByHostAloneSoNoSchemeOrPortSlipsPast() {
         assertTrue(AppAuthPaths.isGuarded("http://calcpace.app/app_auth/redeem", host))
         assertTrue(AppAuthPaths.isGuarded("https://calcpace.app:443/app_auth/redeem", host))
+        assertTrue(AppAuthPaths.isGuarded("https://user@CALCPACE.app/app_auth/redeem", host))
         assertFalse(AppAuthPaths.isGuarded("https://evil.example/app_auth/redeem", host))
     }
 
