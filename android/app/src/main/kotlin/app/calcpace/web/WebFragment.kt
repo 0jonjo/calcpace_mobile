@@ -16,6 +16,7 @@ import app.calcpace.push.PermissionPrompt
 import app.calcpace.push.Push
 import app.calcpace.push.PushStatus
 import dev.hotwire.core.turbo.errors.VisitError
+import dev.hotwire.core.turbo.webview.HotwireWebView
 import dev.hotwire.navigation.destinations.HotwireDestinationDeepLink
 import dev.hotwire.navigation.fragments.HotwireWebFragment
 
@@ -26,6 +27,11 @@ import dev.hotwire.navigation.fragments.HotwireWebFragment
  */
 @HotwireDestinationDeepLink(uri = "hotwire://fragment/web")
 class WebFragment : HotwireWebFragment() {
+    private var webView: HotwireWebView? = null
+
+    /** The page the WebView shows right now, as far as the WebView knows. */
+    val currentUrl: String? get() = webView?.url
+
     private val notificationCallbacks = PendingCallbacks<Boolean>()
     private var rationaleBeforePrompt = false
     private var promptStartedAt = 0L
@@ -50,6 +56,16 @@ class WebFragment : HotwireWebFragment() {
         inflater.inflate(R.layout.fragment_web, container, false)
 
     override fun toolbarForNavigation(): Toolbar? = null
+
+    override fun onWebViewAttached(webView: HotwireWebView) {
+        super.onWebViewAttached(webView)
+        this.webView = webView
+    }
+
+    override fun onWebViewDetached(webView: HotwireWebView) {
+        super.onWebViewDetached(webView)
+        if (this.webView === webView) this.webView = null
+    }
 
     override fun onVisitCompleted(location: String, completedOffline: Boolean) {
         super.onVisitCompleted(location, completedOffline)

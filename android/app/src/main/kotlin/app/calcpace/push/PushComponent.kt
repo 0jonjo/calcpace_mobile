@@ -1,5 +1,6 @@
 package app.calcpace.push
 
+import app.calcpace.Calcpace
 import app.calcpace.web.WebFragment
 import dev.hotwire.core.bridge.BridgeComponent
 import dev.hotwire.core.bridge.BridgeDelegate
@@ -17,6 +18,9 @@ import kotlinx.serialization.Serializable
  *   creates a token unless the athlete opted in before.
  * - "enable": the athlete tapped "turn on". Shows the system prompt where
  *   there is one, then answers.
+ *
+ * Only the site's home page, where the card lives, may drive it
+ * ([PushPages]); messages from anywhere else are ignored.
  */
 class PushComponent(
     name: String,
@@ -27,6 +31,7 @@ class PushComponent(
         get() = (bridgeDelegate.destination.fragment as? WebFragment)?.takeIf { it.isAdded }
 
     override fun onReceive(message: Message) {
+        if (!PushPages.isHome(fragment?.currentUrl, Calcpace.baseUrl)) return
         when (message.event) {
             "connect" -> answer(message)
             "enable" -> enable(message)

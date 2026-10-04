@@ -26,7 +26,8 @@ import java.io.ByteArrayOutputStream
  * raw string ever reached the router.
  */
 object AppAuthPaths {
-    private const val LOCALES = "en|pt-BR|es|de|fr|ja|it|nl|ko|sv|pl|no|zh-TW|hu|cs|ru"
+    /** The site's locale prefixes. */
+    const val LOCALES = "en|pt-BR|es|de|fr|ja|it|nl|ko|sv|pl|no|zh-TW|hu|cs|ru"
     private const val PREFIX = "(?:/(?:$LOCALES))?"
 
     private val PROVIDER = Regex("^$PREFIX/app_auth/(google|strava)$")
