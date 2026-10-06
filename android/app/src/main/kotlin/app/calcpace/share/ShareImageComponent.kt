@@ -3,6 +3,7 @@ package app.calcpace.share
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.net.Uri
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import app.calcpace.Calcpace
 import app.calcpace.web.WebFragment
@@ -24,11 +25,13 @@ import kotlinx.serialization.Serializable
  *   → `{ ok: true }` once the share sheet was started, or
  *   `{ ok: false, error: "invalid" }` when the payload doesn't hold up, or
  *   `{ ok: false, error: "failed" }` when writing the file or starting the
- *   sheet didn't work.
+ *   sheet didn't work, or the app was no longer in the foreground to start
+ *   it (the athlete taps again).
  *
- * Only a run's page may drive it ([SharePages]); messages from anywhere else
- * get no answer. One share at a time: a "share" that arrives while another
- * is being prepared (a double tap) is ignored and never answered; the first
+ * Only while the WebView shows a run's page ([SharePages], which also says
+ * why frames aren't told apart); messages sent from any other page get no
+ * answer. One share at a time: a "share" that arrives while another is
+ * being prepared (a double tap) is ignored and never answered; the first
  * one's answer stands for both.
  *
  * Decoding and writing happen off the main thread. If the page went away in
@@ -80,14 +83,26 @@ class ShareImageComponent(
         when (prepared) {
             Prepared.Invalid -> reply(message, Failure(ok = false, error = "invalid"))
             Prepared.Failed -> reply(message, Failure(ok = false, error = "failed"))
-            is Prepared.Ready -> try {
-                fragment.requireActivity().startActivity(ShareImageFiles.chooser(prepared.uri))
-                reply(message, Success(ok = true))
-            } catch (_: ActivityNotFoundException) {
-                reply(message, Failure(ok = false, error = "failed"))
-            } catch (_: SecurityException) {
-                reply(message, Failure(ok = false, error = "failed"))
-            }
+            is Prepared.Ready ->
+                if (startChooser(fragment, prepared.uri)) {
+                    reply(message, Success(ok = true))
+                } else {
+                    reply(message, Failure(ok = false, error = "failed"))
+                }
+        }
+    }
+
+    // Started from the background, the chooser would be blocked or pop up
+    // over whatever the athlete went to: that counts as failed too.
+    private fun startChooser(fragment: WebFragment, uri: Uri): Boolean {
+        if (!fragment.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return false
+        return try {
+            fragment.requireActivity().startActivity(ShareImageFiles.chooser(uri))
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: SecurityException) {
+            false
         }
     }
 

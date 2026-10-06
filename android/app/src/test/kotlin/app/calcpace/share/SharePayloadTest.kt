@@ -110,8 +110,8 @@ class SharePayloadTest {
     }
 
     @Test
-    fun theRealCapIsTwelveMegabytes() {
-        assertEquals(12 * 1024 * 1024, SharePayload.MAX_BYTES)
+    fun theRealCapIsEightMegabytes() {
+        assertEquals(8 * 1024 * 1024, SharePayload.MAX_BYTES)
         assertNotNull(SharePayload.decodePng(encode(pngOf(SharePayload.MAX_BYTES))))
         assertNull(SharePayload.decodePng(encode(pngOf(SharePayload.MAX_BYTES + 1))))
     }

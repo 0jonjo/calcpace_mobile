@@ -20,8 +20,12 @@ import kotlinx.serialization.json.JsonPrimitive
  * the rules are unit tested on the JVM.
  */
 object SharePayload {
-    /** A 1080×1920 card is a few MB at most; this leaves room for a photo. */
-    const val MAX_BYTES = 12 * 1024 * 1024
+    /**
+     * A 1080×1920 card is a few MB at most; this leaves room for a photo.
+     * The page refuses anything bigger too: Hotwire parses and keeps every
+     * message on the main thread before this code sees it.
+     */
+    const val MAX_BYTES = 8 * 1024 * 1024
 
     private val FILENAME = Regex("^[A-Za-z0-9_-][A-Za-z0-9._-]{0,75}\\.png$")
     private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
