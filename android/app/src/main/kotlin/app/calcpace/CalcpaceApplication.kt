@@ -5,6 +5,7 @@ import app.calcpace.auth.AppAuthRouteDecisionHandler
 import app.calcpace.health.HealthComponent
 import app.calcpace.push.Push
 import app.calcpace.push.PushComponent
+import app.calcpace.share.ShareImageComponent
 import app.calcpace.web.WebFragment
 import dev.hotwire.core.bridge.BridgeComponentFactory
 import dev.hotwire.core.bridge.KotlinXJsonConverter
@@ -42,12 +43,14 @@ class CalcpaceApplication : Application() {
 
         // Native pieces the site can drive. "push" asks for notifications
         // from the home page's card; "health" links Health Connect from the
-        // home card and the account page. The page's user agent lists them,
+        // home card and the account page; "share-image" hands a run's share
+        // card to the share sheet. The page's user agent lists them,
         // so the site only talks to components this build has.
         Hotwire.config.jsonConverter = KotlinXJsonConverter()
         Hotwire.registerBridgeComponents(
             BridgeComponentFactory("push", ::PushComponent),
             BridgeComponentFactory("health", ::HealthComponent),
+            BridgeComponentFactory("share-image", ::ShareImageComponent),
         )
 
         // The site looks for "Hotwire Native" in the user agent to know it is

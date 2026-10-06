@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the share-image FileProvider may hand out: the one card being
+     shared (ShareImageFiles), nothing else in the app's storage. -->
+<paths>
+    <cache-path name="shared_images" path="shared_images/" />
+</paths>
