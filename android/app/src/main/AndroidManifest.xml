@@ -100,6 +100,19 @@
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             tools:node="remove" />
 
+        <!-- A run's share card on its way to the share sheet: content://
+             URIs for cacheDir/shared_images/ only, readable by the app
+             picked through a one-off grant (ShareImageFiles). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.shareimages"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_image_paths" />
+        </provider>
+
         <!-- "Your run is in": data-only FCM messages, drawn by RunNotifications. -->
         <service
             android:name=".push.CalcpaceMessagingService"
