@@ -5,7 +5,7 @@ package app.calcpace.health
  * "background" event) does. Health Connect stops showing its screen once the
  * athlete has refused twice: the request then comes back at once, still not
  * allowed, and asking again would loop. So once a request comes back without
- * background reads, the next tap opens Health Connect's settings for the app
+ * background reads, the next tap opens Health Connect's settings
  * instead, where the athlete can always switch them on. Never right after the
  * refusal itself: that may have been the athlete's real "no".
  *

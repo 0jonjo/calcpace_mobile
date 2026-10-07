@@ -1,6 +1,6 @@
 package app.calcpace.health
 
-import android.content.ActivityNotFoundException
+import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import app.calcpace.Calcpace
 import app.calcpace.web.WebFragment
@@ -170,14 +170,13 @@ class HealthComponent(
         reply(message, Background(HcStatus.AVAILABLE, background))
     }
 
+    // Whatever goes wrong here (no such screen, a SecurityException), the
+    // page still gets the real answer, not "unavailable" from guarded().
     private fun openPermissionSettings(fragment: WebFragment) {
-        HealthConnect.permissionSettingsIntents(fragment.requireContext()).firstOrNull { intent ->
-            try {
-                fragment.startActivity(intent)
-                true
-            } catch (_: ActivityNotFoundException) {
-                false
-            }
+        try {
+            fragment.startActivity(HealthConnect.settingsIntent())
+        } catch (e: Exception) {
+            Log.w(TAG, "could not open Health Connect's settings", e)
         }
     }
 
@@ -238,4 +237,8 @@ class HealthComponent(
 
     @Serializable
     data class Linked(val linked: Boolean)
+
+    private companion object {
+        const val TAG = "HealthComponent"
+    }
 }
