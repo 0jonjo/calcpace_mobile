@@ -1,5 +1,6 @@
 package app.calcpace.health
 
+import android.content.ActivityNotFoundException
 import androidx.lifecycle.lifecycleScope
 import app.calcpace.Calcpace
 import app.calcpace.web.WebFragment
@@ -34,7 +35,8 @@ import kotlinx.serialization.json.JsonPrimitive
  *   session's link, so the app forgets its token too.
  * - "background" `{}` → `{ status, background }`: asks Health Connect for
  *   background reads alone, when the phone has them and they aren't allowed
- *   yet. No link gate: it hands the page nothing to link with, and leaves
+ *   yet, or opens its settings when the last ask came back without them
+ *   ([HcBackgroundAsk]). No link gate: it hands the page nothing to link with, and leaves
  *   the link, its token and the sync state as they are; only the periodic
  *   sync follows the answer.
  *
@@ -96,8 +98,9 @@ class HealthComponent(
         val client = HealthConnect.client(context)
         val background = client?.let { HealthConnect.background(it, it.permissionController.getGrantedPermissions()) }
         // The athlete may have allowed (or stopped) background reads in
-        // Health Connect's settings since the link.
-        HcSync.backgroundChanged(context, background == true)
+        // Health Connect's settings since the link. Without a client nobody
+        // knows: the periodic sync is left as it is.
+        if (client != null) HcSync.backgroundChanged(context, background == true)
         reply(message, State(HealthConnect.status(context), linked, background))
     }
 
@@ -136,30 +139,46 @@ class HealthComponent(
         reply(message, answer.copy(granted = confirmed, grant = if (confirmed) linkGate.open() else null))
     }
 
+    /**
+     * The first tap asks Health Connect; once that came back without
+     * background reads, the next tap opens Health Connect's settings instead
+     * and answers at once ([HcBackgroundAsk]). The page asks "connect" again
+     * when the athlete comes back.
+     */
     private suspend fun background(fragment: WebFragment, message: Message) {
         val context = fragment.requireContext()
-        val client = HealthConnect.client(context)
-        val background = when {
-            client == null -> null
-            !HealthConnect.backgroundAvailable(client) -> null
-            else -> {
-                val before = client.permissionController.getGrantedPermissions()
+        // Unknown isn't "no": the periodic sync is left as it is.
+        val client = HealthConnect.client(context) ?: return reply(message, Background(HealthConnect.status(context), null))
+        val before = HealthConnect.background(client, client.permissionController.getGrantedPermissions())
+        val background = when (HcBackgroundAsk.shared.next(before)) {
+            HcBackgroundAsk.Step.NOTHING -> before
+            HcBackgroundAsk.Step.SETTINGS -> before.also { openPermissionSettings(fragment) }
+            HcBackgroundAsk.Step.REQUEST -> {
                 // Only the one permission: the screen lists nothing else, and
                 // the rest stays as the athlete left it. Read back afterwards,
                 // as in "enable". A second request while the screen is up
                 // waits for the first one's (WebFragment).
-                val after = if (HealthConnect.BACKGROUND in before) before else {
-                    suspendCancellableCoroutine { done ->
-                        fragment.requestHealthPermissions(setOf(HealthConnect.BACKGROUND)) { done.resume(Unit) }
-                    }
-                    client.permissionController.getGrantedPermissions()
+                suspendCancellableCoroutine { done ->
+                    fragment.requestHealthPermissions(setOf(HealthConnect.BACKGROUND)) { done.resume(Unit) }
                 }
-                HealthConnect.background(client, after)
+                HealthConnect.background(client, client.permissionController.getGrantedPermissions())
+                    .also { HcBackgroundAsk.shared.requested(it) }
             }
         }
-        // A no-op without a link token.
+        // A no-op without a link token; cancels it when the phone has no background reads.
         HcSync.backgroundChanged(context, background == true)
-        reply(message, Background(if (client == null) HealthConnect.status(context) else HcStatus.AVAILABLE, background))
+        reply(message, Background(HcStatus.AVAILABLE, background))
+    }
+
+    private fun openPermissionSettings(fragment: WebFragment) {
+        HealthConnect.permissionSettingsIntents(fragment.requireContext()).firstOrNull { intent ->
+            try {
+                fragment.startActivity(intent)
+                true
+            } catch (_: ActivityNotFoundException) {
+                false
+            }
+        }
     }
 
     private suspend fun link(fragment: WebFragment, message: Message) {

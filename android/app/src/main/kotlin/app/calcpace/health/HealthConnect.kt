@@ -2,6 +2,8 @@ package app.calcpace.health
 
 import android.content.Context
 import android.content.Intent
+import android.health.connect.HealthConnectManager
+import android.os.Build
 import androidx.core.net.toUri
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.HealthConnectFeatures
@@ -52,6 +54,19 @@ object HealthConnect {
     /** [HcBackground]: allowed, not allowed, or not on this phone (null), with [granted] what Health Connect holds. */
     fun background(client: HealthConnectClient, granted: Set<String>): Boolean? =
         HcBackground.of(backgroundAvailable(client), BACKGROUND in granted)
+
+    /**
+     * Health Connect's settings, where the athlete can allow what its
+     * permission screen no longer asks (after two refusals), best first: the
+     * app's own permissions (Android 14+, where Health Connect is part of the
+     * system), then Health Connect's main settings.
+     */
+    fun permissionSettingsIntents(context: Context): List<Intent> = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            add(Intent(HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS).putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName))
+        }
+        add(Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS))
+    }
 
     /** Health Connect's page on Play, to install or update it (from the official sample). */
     fun installIntent(context: Context): Intent =
