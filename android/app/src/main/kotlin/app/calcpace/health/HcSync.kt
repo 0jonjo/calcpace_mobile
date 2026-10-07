@@ -21,8 +21,12 @@ import kotlinx.coroutines.launch
 
 /**
  * When the import runs. A sync whenever the app comes to the foreground
- * (the only road when background reads are not allowed), and about hourly
- * in the background when they are. Nothing at all without a link token.
+ * (the only road when background reads are not allowed), and every quarter
+ * of an hour or so in the background when they are — the shortest period
+ * WorkManager runs, and Android may stretch it (Doze, a maker's battery
+ * saver). A run read from Health Connect is a read of what changed since the
+ * last token, so the short period costs little. Nothing at all without a link
+ * token.
  */
 object HcSync {
     private const val TAG = "HcSync"
@@ -67,11 +71,13 @@ object HcSync {
     }
 
     fun schedulePeriodic(context: Context) {
-        val request = PeriodicWorkRequestBuilder<HcSyncWorker>(1, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<HcSyncWorker>(15, TimeUnit.MINUTES)
             .setConstraints(NETWORK)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
             .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.KEEP, request)
+        // UPDATE, not KEEP: a phone scheduled by an older build (hourly) takes
+        // the new period without losing its place in the schedule.
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
     fun cancelPeriodic(context: Context) {
