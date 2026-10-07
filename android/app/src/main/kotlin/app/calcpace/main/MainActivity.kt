@@ -25,11 +25,13 @@ class MainActivity : HotwireActivity() {
     }
 
     // Health Connect runs arrive whenever the app comes to the foreground,
-    // the only way they do when background reads aren't allowed. Nothing
-    // happens on a phone that hasn't linked Health Connect.
+    // the only way they do when background reads aren't allowed; background
+    // reads allowed in the system's settings meanwhile start the periodic
+    // sync. Nothing happens on a phone that hasn't linked Health Connect.
     override fun onStart() {
         super.onStart()
         HcSync.now(this)
+        HcSync.refreshBackground(this)
     }
 
     // A cold start from a link or from a finished sign-in begins there instead
