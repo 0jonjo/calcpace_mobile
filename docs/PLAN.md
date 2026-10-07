@@ -77,12 +77,17 @@ Ordered by impact for effort.
    | `enable` | `{}` | `{ "status": S, "granted": G, "background": B, "grant": N }`, after Health Connect's screen (or Play's, for `install_required`); `grant` only with `granted: true` |
    | `link` | `{ "token": T, "grant": N }` | `{ "linked": true }`, or `{ "linked": false }` if T is malformed or N isn't the open grant |
    | `unlink` | `{}` | `{ "linked": false }` |
+   | `background` | `{}` | `{ "status": S, "background": B }`, after Health Connect's screen when there was something to ask |
 
    - `S` is `available`, `install_required` (install or update Health Connect from Play) or `unavailable`.
-   - `L`: the app holds a link token. `B`: background reads exist on the phone and are allowed. `G`: `READ_EXERCISE` and `READ_DISTANCE` allowed (heart rate and climb are optional).
+   - `L`: the app holds a link token. `G`: `READ_EXERCISE` and `READ_DISTANCE` allowed (heart rate and climb are optional).
+   - `B` is always in the reply, `null` included: `true` background reads exist on the phone and are allowed; `false` they exist and aren't allowed (`background` can ask); `null` nothing to ask, because the phone has no background reads (Health Connect too old) or `S` isn't `available`. Hotwire's JSON leaves null properties out, so the app writes this one as an explicit JSON null.
+   - `background` asks Health Connect for `READ_HEALTH_DATA_IN_BACKGROUND` alone, and only when `B` would be `false`; with `true` or `null` it answers at once, with no screen (no Play page either for `install_required`). It never goes through the link gate and leaves the link token, the consent and the sync state alone: it is for a linked phone that hasn't allowed background reads yet (the account page's hint). Health Connect shows nothing once the athlete has refused twice (its documentation; not yet seen on a phone): the request then comes back at once and `B` is `false` again, and only Health Connect's settings can change it.
+   - `connect`, `enable` and `background` each schedule the 15-minute background sync when `B` is `true` and cancel it otherwise (only for a linked phone), so `enable` does it even when its confirmation is cancelled.
+   - A second `enable` or `background` while Health Connect's screen is up doesn't open it again: it waits for that screen, then answers from what Health Connect holds.
    - `T`: 43 base64url characters; the app refuses anything else.
    - `N`: a one-time grant, 43 base64url characters (256 random bits), handed out only in the reply to a granted `enable` (the reply reaches only the caller's callback in the page, not other frames). `link` is taken only with the latest `N`, once, within 5 minutes; any `link` closes the gate, right or wrong, so a guessed or missing `N` means a new `enable`. (Contract change agreed in review round 2; calcpace_web mirrors it.)
-   - Only the home (`/`, `/<locale>`) and the account page (`/account`, `/<locale>/account`) may drive it.
+   - Only the home (`/`, `/<locale>`) and the account page (`/account`, `/<locale>/account`) may drive it, every event included.
    - Any frame of a page can reach the bridge, hence `N`. When exercise and distance were allowed before, Health Connect may show nothing, so the app asks for a native confirmation before answering `granted: true`; "Cancel" answers `granted: false`.
    - The page, on `enable` with `granted: true`, posts to `/health_connect/link` (cookie + CSRF), gets `{ "token": T }`, sends `link` with `T` and the `grant` of that `enable` reply, and reloads on `{ "linked": true }`. If `L` is true and the server has no link for this session, it sends `unlink`.
 
