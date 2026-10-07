@@ -12,6 +12,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -103,6 +104,31 @@ object HcSync {
     fun backgroundChanged(context: Context, background: Boolean) {
         if (HcStore.open(context).linkToken == null) return
         if (background) schedulePeriodic(context) else cancelPeriodic(context)
+    }
+
+    /**
+     * Background reads as Health Connect holds them now, for a linked phone
+     * coming to the foreground: allowed in the system's settings, away from
+     * the account page, they schedule the periodic sync all the same. Off the
+     * main thread (a call to Health Connect); anything Health Connect throws
+     * leaves things as they are. No client (Health Connect needing an update,
+     * say) is no answer either.
+     */
+    fun refreshBackground(context: Context) {
+        if (HcStore.open(context).linkToken == null) return
+        val app = context.applicationContext
+        scope.launch {
+            val background = try {
+                val client = HealthConnect.client(app) ?: return@launch
+                HealthConnect.backgroundGranted(client, client.permissionController.getGrantedPermissions())
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "could not read Health Connect's permissions", e)
+                return@launch
+            }
+            backgroundChanged(app, background)
+        }
     }
 
     /**

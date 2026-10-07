@@ -1,6 +1,6 @@
 package app.calcpace.health
 
-import androidx.health.connect.client.HealthConnectClient
+import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import app.calcpace.Calcpace
 import app.calcpace.web.WebFragment
@@ -13,6 +13,7 @@ import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * The site's "health" bridge component (bridge/health_connect_controller.js
@@ -20,7 +21,8 @@ import kotlinx.serialization.Serializable
  * Connect to the account:
  *
  * - "connect" `{}` → `{ status, linked, background }`: where things stand.
- *   Never asks anything.
+ *   Never asks anything. `background` is [HcBackground]'s true, false or
+ *   null (no background reads on this phone), in every reply that has it.
  * - "enable" `{}` → `{ status, granted, background, grant? }`, after Health
  *   Connect's permission screen (or Play's page, when Health Connect needs
  *   installing or updating). `granted` = exercise and distance allowed and,
@@ -31,6 +33,12 @@ import kotlinx.serialization.Serializable
  *   keeps the token and starts syncing.
  * - "unlink" `{}` → `{ linked: false }`: the server no longer has this
  *   session's link, so the app forgets its token too.
+ * - "background" `{}` → `{ status, background }`: asks Health Connect for
+ *   background reads alone, when the phone has them and they aren't allowed
+ *   yet, or opens its settings when the last ask came back without them
+ *   ([HcBackgroundAsk]). No link gate: it hands the page nothing to link with, and leaves
+ *   the link, its token and the sync state as they are; only the periodic
+ *   sync follows the answer.
  *
  * Only the home and account pages may drive it ([HcPages]); messages from
  * anywhere else are ignored.
@@ -52,6 +60,7 @@ class HealthComponent(
             "connect" -> fragment.guarded(message) { connect(fragment, message) }
             "enable" -> fragment.guarded(message) { enable(fragment, message) }
             "link" -> fragment.guarded(message) { link(fragment, message) }
+            "background" -> fragment.guarded(message) { background(fragment, message) }
             "unlink" -> {
                 HcSync.unlink(fragment.requireContext())
                 reply(message, Linked(false))
@@ -74,9 +83,10 @@ class HealthComponent(
             } catch (_: Exception) {
                 val linked = HcStore.open(context).linkToken != null
                 when (message.event) {
-                    "connect" -> reply(message, State(HcStatus.UNAVAILABLE, linked = linked, background = false))
-                    "enable" -> reply(message, Enabled(HcStatus.UNAVAILABLE, granted = false, background = false))
+                    "connect" -> reply(message, State(HcStatus.UNAVAILABLE, linked = linked, background = null))
+                    "enable" -> reply(message, Enabled(HcStatus.UNAVAILABLE, granted = false, background = null))
                     "link" -> reply(message, Linked(false))
+                    "background" -> reply(message, Background(HcStatus.UNAVAILABLE, background = null))
                 }
             }
         }
@@ -86,11 +96,11 @@ class HealthComponent(
         val context = fragment.requireContext()
         val linked = HcStore.open(context).linkToken != null
         val client = HealthConnect.client(context)
-        val background = client != null &&
-            HealthConnect.backgroundGranted(client, client.permissionController.getGrantedPermissions())
+        val background = client?.let { HealthConnect.background(it, it.permissionController.getGrantedPermissions()) }
         // The athlete may have allowed (or stopped) background reads in
-        // Health Connect's settings since the link.
-        HcSync.backgroundChanged(context, background)
+        // Health Connect's settings since the link. Without a client nobody
+        // knows: the periodic sync is left as it is.
+        if (client != null) HcSync.backgroundChanged(context, background == true)
         reply(message, State(HealthConnect.status(context), linked, background))
     }
 
@@ -100,7 +110,7 @@ class HealthComponent(
         if (client == null) {
             val status = HealthConnect.status(context)
             if (status == HcStatus.INSTALL_REQUIRED) runCatching { context.startActivity(HealthConnect.installIntent(context)) }
-            return reply(message, Enabled(status, granted = false, background = false))
+            return reply(message, Enabled(status, granted = false, background = null))
         }
         val toRequest = HealthConnect.toRequest(client)
         val before = client.permissionController.getGrantedPermissions()
@@ -110,7 +120,13 @@ class HealthComponent(
             suspendCancellableCoroutine { done -> fragment.requestHealthPermissions(toRequest) { done.resume(Unit) } }
             client.permissionController.getGrantedPermissions()
         }
-        val answer = enabled(client, after)
+        val background = HealthConnect.background(client, after)
+        // Background reads may have just been allowed (or not) on that
+        // screen, whatever comes of the link below: a linked phone keeps its
+        // link when the confirmation is cancelled, and its periodic sync must
+        // follow what Health Connect holds now.
+        HcSync.backgroundChanged(context, background == true)
+        val answer = Enabled(HcStatus.AVAILABLE, granted = after.containsAll(HealthConnect.REQUIRED), background = background)
         if (!answer.granted) return reply(message, answer)
 
         // Allowed before: Health Connect may have shown nothing at all, so the
@@ -123,12 +139,46 @@ class HealthComponent(
         reply(message, answer.copy(granted = confirmed, grant = if (confirmed) linkGate.open() else null))
     }
 
-    private fun enabled(client: HealthConnectClient, granted: Set<String>) =
-        Enabled(
-            status = HcStatus.AVAILABLE,
-            granted = granted.containsAll(HealthConnect.REQUIRED),
-            background = HealthConnect.backgroundGranted(client, granted),
-        )
+    /**
+     * The first tap asks Health Connect; once that came back without
+     * background reads, the next tap opens Health Connect's settings instead
+     * and answers at once ([HcBackgroundAsk]). The page asks "connect" again
+     * when the athlete comes back.
+     */
+    private suspend fun background(fragment: WebFragment, message: Message) {
+        val context = fragment.requireContext()
+        // Unknown isn't "no": the periodic sync is left as it is.
+        val client = HealthConnect.client(context) ?: return reply(message, Background(HealthConnect.status(context), null))
+        val before = HealthConnect.background(client, client.permissionController.getGrantedPermissions())
+        val background = when (HcBackgroundAsk.shared.next(before)) {
+            HcBackgroundAsk.Step.NOTHING -> before
+            HcBackgroundAsk.Step.SETTINGS -> before.also { openPermissionSettings(fragment) }
+            HcBackgroundAsk.Step.REQUEST -> {
+                // Only the one permission: the screen lists nothing else, and
+                // the rest stays as the athlete left it. Read back afterwards,
+                // as in "enable". A second request while the screen is up
+                // waits for the first one's (WebFragment).
+                suspendCancellableCoroutine { done ->
+                    fragment.requestHealthPermissions(setOf(HealthConnect.BACKGROUND)) { done.resume(Unit) }
+                }
+                HealthConnect.background(client, client.permissionController.getGrantedPermissions())
+                    .also { HcBackgroundAsk.shared.requested(it) }
+            }
+        }
+        // A no-op without a link token; cancels it when the phone has no background reads.
+        HcSync.backgroundChanged(context, background == true)
+        reply(message, Background(HcStatus.AVAILABLE, background))
+    }
+
+    // Whatever goes wrong here (no such screen, a SecurityException), the
+    // page still gets the real answer, not "unavailable" from guarded().
+    private fun openPermissionSettings(fragment: WebFragment) {
+        try {
+            fragment.startActivity(HealthConnect.settingsIntent())
+        } catch (e: Exception) {
+            Log.w(TAG, "could not open Health Connect's settings", e)
+        }
+    }
 
     private suspend fun link(fragment: WebFragment, message: Message) {
         val context = fragment.requireContext()
@@ -159,13 +209,36 @@ class HealthComponent(
         if (fragment != null) replyWith(message.replacing(message.event, data))
     }
 
+    private fun reply(message: Message, data: Background) {
+        if (fragment != null) replyWith(message.replacing(message.event, data))
+    }
+
+    // `background` is held as a JsonPrimitive so that null goes out as JSON
+    // null: Hotwire's Json leaves null properties out (explicitNulls =
+    // false), and the site tells "not on this phone" (null) from "not
+    // allowed" (false) by the value. Built from [HcBackground]'s Boolean?.
+
     @Serializable
-    data class State(val status: String, val linked: Boolean, val background: Boolean)
+    data class State(val status: String, val linked: Boolean, val background: JsonPrimitive) {
+        constructor(status: String, linked: Boolean, background: Boolean?) : this(status, linked, JsonPrimitive(background))
+    }
 
     /** [grant] only with granted = true: "link" must carry it back (HcLinkGate). */
     @Serializable
-    data class Enabled(val status: String, val granted: Boolean, val background: Boolean, val grant: String? = null)
+    data class Enabled(val status: String, val granted: Boolean, val background: JsonPrimitive, val grant: String? = null) {
+        constructor(status: String, granted: Boolean, background: Boolean?, grant: String? = null) :
+            this(status, granted, JsonPrimitive(background), grant)
+    }
+
+    @Serializable
+    data class Background(val status: String, val background: JsonPrimitive) {
+        constructor(status: String, background: Boolean?) : this(status, JsonPrimitive(background))
+    }
 
     @Serializable
     data class Linked(val linked: Boolean)
+
+    private companion object {
+        const val TAG = "HealthComponent"
+    }
 }

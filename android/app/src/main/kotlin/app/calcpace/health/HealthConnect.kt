@@ -47,7 +47,20 @@ object HealthConnect {
 
     /** Background reads both exist on this phone and are allowed. */
     fun backgroundGranted(client: HealthConnectClient, granted: Set<String>): Boolean =
-        BACKGROUND in granted && backgroundAvailable(client)
+        background(client, granted) == true
+
+    /** [HcBackground]: allowed, not allowed, or not on this phone (null), with [granted] what Health Connect holds. */
+    fun background(client: HealthConnectClient, granted: Set<String>): Boolean? =
+        HcBackground.of(backgroundAvailable(client), BACKGROUND in granted)
+
+    /**
+     * Health Connect's settings, where the athlete can allow what its
+     * permission screen no longer asks (after two refusals). Its home, not
+     * the app's own permissions: that screen
+     * (HealthConnectManager.ACTION_MANAGE_HEALTH_PERMISSIONS) is for the
+     * system only, and starting it throws a SecurityException.
+     */
+    fun settingsIntent(): Intent = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
 
     /** Health Connect's page on Play, to install or update it (from the official sample). */
     fun installIntent(context: Context): Intent =
