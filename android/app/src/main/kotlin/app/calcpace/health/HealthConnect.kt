@@ -47,7 +47,11 @@ object HealthConnect {
 
     /** Background reads both exist on this phone and are allowed. */
     fun backgroundGranted(client: HealthConnectClient, granted: Set<String>): Boolean =
-        BACKGROUND in granted && backgroundAvailable(client)
+        background(client, granted) == true
+
+    /** [HcBackground]: allowed, not allowed, or not on this phone (null), with [granted] what Health Connect holds. */
+    fun background(client: HealthConnectClient, granted: Set<String>): Boolean? =
+        HcBackground.of(backgroundAvailable(client), BACKGROUND in granted)
 
     /** Health Connect's page on Play, to install or update it (from the official sample). */
     fun installIntent(context: Context): Intent =
