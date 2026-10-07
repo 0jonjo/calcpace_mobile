@@ -30,6 +30,7 @@ Ordered by impact for effort.
    - [x] Firebase options from a `google-services.json` outside the repo; CI builds with push off, release fails without it
    - [x] `push` bridge component, FCM token only after the athlete taps "turn on" (auto-init off)
    - [x] Data-only message → notification on a `runs` channel (16 languages); the tap only opens a same-site path
+   - [x] Back from a run opened by the notification goes home (`feat/notification-back-to-home`). A tap with no MainActivity running starts at home and routes the run on top once the navigator is ready, so Back goes home and a second Back leaves the app. With the activity running, the run is routed on top of the current page, as before. Only the notification's intent asks for this (an extra), and only for an ordinary site page (`IncomingLink.Web`; the home itself isn't put on top of the home). Other links still start where they point. An activity restored from saved state (rotation, process death) gets its own back stack back. Reopened from Recents after Back closed the app, it starts at home without the run (the tap was used up); before, it opened the run again.
    - [ ] End to end on the emulator against the Rails branch (permission prompt, token registered, notification, tap cold and warm)
    - [ ] Real phone; then restrict the Android API key to the package and the Play signing SHA-1s
 

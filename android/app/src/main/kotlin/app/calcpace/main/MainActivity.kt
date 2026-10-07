@@ -13,10 +13,16 @@ import app.calcpace.R
 import app.calcpace.auth.AppAuth
 import app.calcpace.health.HcSync
 import dev.hotwire.navigation.activities.HotwireActivity
+import dev.hotwire.navigation.navigator.Navigator
 import dev.hotwire.navigation.navigator.NavigatorConfiguration
 
 class MainActivity : HotwireActivity() {
+    private var restored = false
+    private var runToRoute: String? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        restored = savedInstanceState != null
+        runToRoute = notificationLaunch?.then
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -37,8 +43,35 @@ class MainActivity : HotwireActivity() {
     // A cold start from a link or from a finished sign-in begins there instead
     // of at the home page. A start location never passes through the router,
     // so this is the only place a cold-start redeem is let through. Lazy so
-    // the answer can't change between the two times Hotwire asks.
-    private val startLocation by lazy { locationFor(intent?.data, routed = false) ?: Calcpace.baseUrl }
+    // the answer can't change between the two times Hotwire asks. A cold
+    // start from the run notification begins at home instead, and the run
+    // is routed on top of it once the navigator is ready (NotificationLaunch).
+    private val startLocation by lazy {
+        notificationLaunch?.start ?: locationFor(intent?.data, routed = false) ?: Calcpace.baseUrl
+    }
+
+    private val notificationLaunch by lazy {
+        val intent = intent ?: return@lazy null
+        NotificationLaunch.plan(
+            url = intent.data?.toString(),
+            fromNotification = intent.getBooleanExtra(NotificationLaunch.EXTRA, false),
+            fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0,
+            restored = restored,
+            baseUrl = Calcpace.baseUrl,
+        )
+    }
+
+    // Called as the start destination is attached, in the middle of the
+    // fragment transaction: the run is routed once that is done. Once per
+    // activity: a recreated one (rotation) has its back stack restored.
+    override fun onNavigatorReady(navigator: Navigator) {
+        super.onNavigatorReady(navigator)
+        val run = runToRoute ?: return
+        runToRoute = null
+        window.decorView.post {
+            if (!isFinishing && !isDestroyed) navigator.route(run)
+        }
+    }
 
     override fun navigatorConfigurations() = listOf(
         NavigatorConfiguration(
