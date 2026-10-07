@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import app.calcpace.R
 import app.calcpace.main.MainActivity
+import app.calcpace.main.NotificationLaunch
 
 /** The "your run is in" notification, drawn by the app itself from a data-only message. */
 object RunNotifications {
@@ -38,10 +39,12 @@ object RunNotifications {
 
         // One notification per run: the same run arriving twice replaces it.
         val id = notice.url.hashCode()
-        // MainActivity takes it from here (IncomingLink, again): the start
-        // location on a cold start, onNewIntent otherwise.
+        // MainActivity takes it from here (IncomingLink, again): on a cold
+        // start home with the run on top (NotificationLaunch, which the extra
+        // asks for), onNewIntent otherwise.
         val open = Intent(Intent.ACTION_VIEW, notice.url.toUri(), context, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(NotificationLaunch.EXTRA, true)
         val tap = PendingIntent.getActivity(
             context, id, open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
