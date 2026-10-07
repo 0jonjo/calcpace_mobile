@@ -76,7 +76,8 @@ object HcSync {
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
             .build()
         // UPDATE, not KEEP: a phone scheduled by an older build (hourly) takes
-        // the new period without losing its place in the schedule.
+        // the new period; its next run moves to 15 minutes after the last one
+        // (often at once). Same spec again (every Account visit) changes nothing.
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(PERIODIC, ExistingPeriodicWorkPolicy.UPDATE, request)
     }
 
