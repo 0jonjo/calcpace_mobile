@@ -54,8 +54,11 @@ class CalcpaceApplication : Application() {
         )
 
         // The site looks for "Hotwire Native" in the user agent to know it is
-        // inside the app; this prefix tells it which one.
-        Hotwire.config.applicationUserAgentPrefix = "Calcpace Android;"
+        // inside the app; this prefix tells it which one, and which build: the
+        // account page shows it, and names the app's sessions with it
+        // ("Calcpace Android/2.0.0 (3);").
+        Hotwire.config.applicationUserAgentPrefix =
+            "Calcpace Android/${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE});"
         Hotwire.config.webViewDebuggingEnabled = BuildConfig.DEBUG
         Hotwire.config.logger.logLevel =
             if (BuildConfig.DEBUG) HotwireLogLevel.DEBUG else HotwireLogLevel.NONE
