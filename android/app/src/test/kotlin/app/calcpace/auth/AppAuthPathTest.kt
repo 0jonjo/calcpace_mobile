@@ -28,15 +28,6 @@ class AppAuthPathTest {
         assertFalse(AppAuthPaths.isCallback("$site//app_auth/callback?ticket=a"))
     }
 
-    @Test
-    fun onlyTheExactStartPathCounts() {
-        assertTrue(AppAuthPaths.isStart("$site/app_auth/start?provider=google&challenge=c"))
-        assertTrue(AppAuthPaths.isStart("$site/pt-BR/app_auth/start"))
-        listOf("//app_auth/start", "/en//app_auth/start", "/app_auth//start", "/app_auth/start/", "/./app_auth/start", "/%61pp_auth/start")
-            .forEach { assertFalse(it, AppAuthPaths.isStart("$site$it")) }
-        assertFalse(AppAuthPaths.isStart("$site/app_auth/redeem"))
-    }
-
     // Round-2 review: Rails collapses "//", the WebView resolves "/./" and
     // "%2e", so every spelling of an app_auth path has to be guarded.
     @Test

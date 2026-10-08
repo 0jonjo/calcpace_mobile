@@ -33,7 +33,6 @@ object AppAuthPaths {
     private val PROVIDER = Regex("^$PREFIX/app_auth/(google|strava)$")
     private val REDEEM = Regex("^$PREFIX/app_auth/redeem$")
     private val CALLBACK = Regex("^$PREFIX/app_auth/callback$")
-    private val START = Regex("^$PREFIX/app_auth/start$")
     private val PROVIDER_STEP = Regex("^$PREFIX/auth(?:/.*)?$")
     private val SIGN_IN_PAGE = Regex("^$PREFIX/session(?:/new)?$")
     private val ABSOLUTE = Regex("^([A-Za-z][A-Za-z0-9+.-]*)://([^/?#]*)([^?#]*)")
@@ -54,9 +53,6 @@ object AppAuthPaths {
     fun isRedeem(url: String): Boolean = parse(url)?.let { REDEEM.matches(it.rawPath) } ?: false
 
     fun isCallback(url: String): Boolean = parse(url)?.let { CALLBACK.matches(it.rawPath) } ?: false
-
-    /** The exact /app_auth/start, the sign-in's first page, which only ever runs in a browser. */
-    fun isStart(url: String): Boolean = parse(url)?.let { START.matches(it.rawPath) } ?: false
 
     /** /auth/… with or without a locale, however spelled. */
     fun isProviderStep(url: String): Boolean = parse(url)?.let { PROVIDER_STEP.matches(it.cleanPath) } ?: false

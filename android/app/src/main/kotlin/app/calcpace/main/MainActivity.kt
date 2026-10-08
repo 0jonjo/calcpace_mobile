@@ -3,6 +3,7 @@ package app.calcpace.main
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -18,6 +19,11 @@ import dev.hotwire.navigation.navigator.Navigator
 import dev.hotwire.navigation.navigator.NavigatorConfiguration
 
 class MainActivity : HotwireActivity() {
+    companion object {
+        // Process-wide: a bounce can land in a new activity.
+        private val browserForwards = BrowserForwards()
+    }
+
     private var restored = false
     private var runToRoute: String? = null
 
@@ -47,16 +53,24 @@ class MainActivity : HotwireActivity() {
     // the answer can't change between the two times Hotwire asks. A cold
     // start from the run notification begins at home instead, and the run
     // is routed on top of it once the navigator is ready (NotificationLaunch).
+    // A restored activity, or one reopened from Recents, gets the same
+    // launch intent again: its sign-in and browser hand-off are not rerun
+    // (IncomingLink.classifyLaunch).
     private val startLocation by lazy {
-        notificationLaunch?.start ?: locationFor(intent?.data, routed = false) ?: Calcpace.baseUrl
+        notificationLaunch?.start
+            ?: locationFor(intent?.data, routed = false, restored = restored, fromHistory = launchedFromHistory)
+            ?: Calcpace.baseUrl
     }
+
+    private val launchedFromHistory: Boolean
+        get() = (intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
 
     private val notificationLaunch by lazy {
         val intent = intent ?: return@lazy null
         NotificationLaunch.plan(
             url = intent.data?.toString(),
             fromNotification = intent.getBooleanExtra(NotificationLaunch.EXTRA, false),
-            fromHistory = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0,
+            fromHistory = launchedFromHistory,
             restored = restored,
             baseUrl = Calcpace.baseUrl,
         )
@@ -91,18 +105,28 @@ class MainActivity : HotwireActivity() {
 
     /**
      * Where an incoming link should take the WebView, or null to stay put.
-     * See [IncomingLink] for which links may do what.
+     * See [IncomingLink] for which links may do what. [restored] and
+     * [fromHistory] mark a launch intent read again, whose side effects
+     * already ran.
      */
-    private fun locationFor(uri: Uri?, routed: Boolean): String? {
+    private fun locationFor(
+        uri: Uri?,
+        routed: Boolean,
+        restored: Boolean = false,
+        fromHistory: Boolean = false,
+    ): String? {
         if (uri == null) return null
 
-        return when (val link = IncomingLink.classify(uri.toString(), Calcpace.baseUrl)) {
+        val url = uri.toString()
+        return when (val link = IncomingLink.classifyLaunch(url, Calcpace.baseUrl, restored, fromHistory)) {
             is IncomingLink.SignIn -> AppAuth.redeemLocation(this, link.ticket, routed)
             is IncomingLink.BrowserTab -> {
                 // The OAuth state this step must match lives in the tab's
-                // cookies, so it goes back there, in a named browser so it
-                // can't bounce back here.
-                BrowserTab.open(this, uri, showTitle = true)
+                // cookies, so it goes back there, in a named browser. A
+                // browser that gives it straight back gets it only once.
+                if (browserForwards.take(url, SystemClock.elapsedRealtime())) {
+                    BrowserTab.open(this, uri, showTitle = true)
+                }
                 null
             }
             is IncomingLink.Web -> link.url

@@ -29,22 +29,11 @@ class IncomingLinkTest {
     // The attack the review found: a redeem link from outside must never
     // reach the WebView, whatever ticket and verifier it carries.
     @Test
-    fun redeemAndProviderLinksFromOutsideAreRefused() {
+    fun redeemAndStartLinksFromOutsideAreRefused() {
         assertEquals(Ignore, classify("$base/app_auth/redeem?ticket=$ticket&verifier=x"))
         assertEquals(Ignore, classify("$base/en/app_auth/redeem?ticket=$ticket&verifier=x"))
+        assertEquals(Ignore, classify("$base/app_auth/start?provider=strava&challenge=x"))
         assertEquals(Ignore, classify("$base/app_auth/google"))
-    }
-
-    // The app is the verified handler of all of calcpace.app: a sign-in
-    // start a browser handed over instead of loading goes back to a browser,
-    // never into the WebView.
-    @Test
-    fun aSignInStartGoesToTheBrowser() {
-        val url = "$base/app_auth/start?provider=strava&challenge=x"
-        assertEquals(BrowserTab(url), classify(url))
-        assertEquals(BrowserTab("$base/pt-BR/app_auth/start"), classify("$base/pt-BR/app_auth/start"))
-        listOf("//app_auth/start", "/en//app_auth/start", "/app_auth/start/", "/%2e/app_auth/start")
-            .forEach { assertEquals(it, Ignore, classify("$base$it?provider=strava&challenge=x")) }
     }
 
     // Round-2 review: "//app_auth/redeem" reached Rails' redeem action and
@@ -84,5 +73,30 @@ class IncomingLinkTest {
         val local = "http://10.0.2.2:3001"
         assertEquals(SignIn(ticket), IncomingLink.classify("$local/app_auth/callback?ticket=$ticket", local))
         assertEquals(Ignore, IncomingLink.classify("http://10.0.2.2:3000/", local))
+    }
+
+    // A restored activity, or one reopened from Recents, reads its launch
+    // link again: no second redeem, no tab reopened on a spent OAuth code.
+    @Test
+    fun aLaunchReadAgainOnlyKeepsAnOrdinaryPage() {
+        val signIn = "$base/app_auth/callback?ticket=$ticket"
+        val step = "$base/auth/google/callback?code=1&state=2"
+        val page = "$base/pt-BR/race-calendar"
+
+        listOf(true to false, false to true, true to true).forEach { (restored, fromHistory) ->
+            val again = { url: String -> IncomingLink.classifyLaunch(url, base, restored, fromHistory) }
+            assertEquals(Ignore, again(signIn))
+            assertEquals(Ignore, again(step))
+            assertEquals(Web(page), again(page))
+            assertEquals(Ignore, again("$base/app_auth/redeem?ticket=$ticket&verifier=x"))
+        }
+    }
+
+    @Test
+    fun aFreshLaunchIsReadAsAnyLink() {
+        listOf(
+            "$base/app_auth/callback?ticket=$ticket", "$base/auth/google/callback?code=1&state=2",
+            "$base/pt-BR/race-calendar", "$base/app_auth/start?provider=strava&challenge=x"
+        ).forEach { assertEquals(it, classify(it), IncomingLink.classifyLaunch(it, base, restored = false, fromHistory = false)) }
     }
 }

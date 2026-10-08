@@ -12,12 +12,7 @@ import java.net.URLDecoder
  * loaded into the WebView from outside: /app_auth/redeem signs the WebView
  * in, so a redeem link mailed by an attacker would sign the victim into the
  * attacker's account. Only [app.calcpace.auth.AppAuth] builds redeem URLs;
- * from outside, the one app_auth path the WebView may get is the exact
- * callback. The exact /app_auth/start is passed on to the browser, where it
- * belongs: the app is the verified handler of every calcpace.app link, so a
- * browser that hands it over (instead of loading it) would otherwise leave
- * the sign-in stuck. It can't sign anyone in by itself: whatever ticket it
- * ends in is bound to the challenge it carries.
+ * from outside, the one app_auth path accepted is the exact callback.
  *
  * Kept free of Android types so the rules are unit tested on the JVM.
  */
@@ -25,10 +20,7 @@ sealed interface IncomingLink {
     /** The site finished a sign-in started by this app. */
     data class SignIn(val ticket: String) : IncomingLink
 
-    /**
-     * A page that runs in the browser: the sign-in's start, or a provider
-     * step whose OAuth state lives in the browser tab's cookies.
-     */
+    /** A provider step whose OAuth state lives in the browser tab's cookies. */
     data class BrowserTab(val url: String) : IncomingLink
 
     /** An ordinary page. */
@@ -48,14 +40,26 @@ sealed interface IncomingLink {
             if (!sameSite) return Ignore
 
             return when {
-                AppAuthPaths.isGuarded(url, base.host) -> when {
-                    AppAuthPaths.isCallback(url) -> ticketOf(uri)?.let { SignIn(it) } ?: Ignore
-                    AppAuthPaths.isStart(url) -> BrowserTab(url)
-                    else -> Ignore
-                }
+                AppAuthPaths.isGuarded(url, base.host) ->
+                    if (AppAuthPaths.isCallback(url)) ticketOf(uri)?.let { SignIn(it) } ?: Ignore else Ignore
                 AppAuthPaths.isProviderStep(url) -> BrowserTab(url)
                 else -> Web(url)
             }
+        }
+
+        /**
+         * The link that started this activity, read again for a launch that
+         * is not the one that brought it: [restored] from saved state (a
+         * configuration change, or the process having been killed while
+         * the browser tab was in front) or reopened [fromHistory] (Recents
+         * after Back). Its sign-in or hand-off to the browser already ran
+         * (or was meant to) the first time; run again, it would replay a
+         * spent ticket or reopen a tab on a spent OAuth code. Only an
+         * ordinary page still counts.
+         */
+        fun classifyLaunch(url: String, baseUrl: String, restored: Boolean, fromHistory: Boolean): IncomingLink {
+            val link = classify(url, baseUrl)
+            return if ((restored || fromHistory) && link !is Web) Ignore else link
         }
 
         private fun ticketOf(uri: URI): String? =
