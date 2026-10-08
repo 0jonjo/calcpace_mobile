@@ -47,6 +47,21 @@ sealed interface IncomingLink {
             }
         }
 
+        /**
+         * The link that started this activity, read again for a launch that
+         * is not the one that brought it: [restored] from saved state (a
+         * configuration change, or the process having been killed while
+         * the browser tab was in front) or reopened [fromHistory] (Recents
+         * after Back). Its sign-in or hand-off to the browser already ran
+         * (or was meant to) the first time; run again, it would replay a
+         * spent ticket or reopen a tab on a spent OAuth code. Only an
+         * ordinary page still counts.
+         */
+        fun classifyLaunch(url: String, baseUrl: String, restored: Boolean, fromHistory: Boolean): IncomingLink {
+            val link = classify(url, baseUrl)
+            return if ((restored || fromHistory) && link !is Web) Ignore else link
+        }
+
         private fun ticketOf(uri: URI): String? =
             uri.rawQuery.orEmpty().split("&")
                 .map { it.split("=", limit = 2) }

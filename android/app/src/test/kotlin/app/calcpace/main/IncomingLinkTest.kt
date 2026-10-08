@@ -74,4 +74,29 @@ class IncomingLinkTest {
         assertEquals(SignIn(ticket), IncomingLink.classify("$local/app_auth/callback?ticket=$ticket", local))
         assertEquals(Ignore, IncomingLink.classify("http://10.0.2.2:3000/", local))
     }
+
+    // A restored activity, or one reopened from Recents, reads its launch
+    // link again: no second redeem, no tab reopened on a spent OAuth code.
+    @Test
+    fun aLaunchReadAgainOnlyKeepsAnOrdinaryPage() {
+        val signIn = "$base/app_auth/callback?ticket=$ticket"
+        val step = "$base/auth/google/callback?code=1&state=2"
+        val page = "$base/pt-BR/race-calendar"
+
+        listOf(true to false, false to true, true to true).forEach { (restored, fromHistory) ->
+            val again = { url: String -> IncomingLink.classifyLaunch(url, base, restored, fromHistory) }
+            assertEquals(Ignore, again(signIn))
+            assertEquals(Ignore, again(step))
+            assertEquals(Web(page), again(page))
+            assertEquals(Ignore, again("$base/app_auth/redeem?ticket=$ticket&verifier=x"))
+        }
+    }
+
+    @Test
+    fun aFreshLaunchIsReadAsAnyLink() {
+        listOf(
+            "$base/app_auth/callback?ticket=$ticket", "$base/auth/google/callback?code=1&state=2",
+            "$base/pt-BR/race-calendar", "$base/app_auth/start?provider=strava&challenge=x"
+        ).forEach { assertEquals(it, classify(it), IncomingLink.classifyLaunch(it, base, restored = false, fromHistory = false)) }
+    }
 }
