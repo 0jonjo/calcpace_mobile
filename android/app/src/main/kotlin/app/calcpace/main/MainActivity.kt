@@ -12,6 +12,7 @@ import app.calcpace.Calcpace
 import app.calcpace.R
 import app.calcpace.auth.AppAuth
 import app.calcpace.health.HcSync
+import app.calcpace.web.BrowserTab
 import dev.hotwire.navigation.activities.HotwireActivity
 import dev.hotwire.navigation.navigator.Navigator
 import dev.hotwire.navigation.navigator.NavigatorConfiguration
@@ -99,8 +100,9 @@ class MainActivity : HotwireActivity() {
             is IncomingLink.SignIn -> AppAuth.redeemLocation(this, link.ticket, routed)
             is IncomingLink.BrowserTab -> {
                 // The OAuth state this step must match lives in the tab's
-                // cookies, so it goes back there.
-                AppAuth.openInBrowserTab(this, uri)
+                // cookies, so it goes back there, in a named browser so it
+                // can't bounce back here.
+                BrowserTab.open(this, uri, showTitle = true)
                 null
             }
             is IncomingLink.Web -> link.url

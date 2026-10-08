@@ -29,11 +29,22 @@ class IncomingLinkTest {
     // The attack the review found: a redeem link from outside must never
     // reach the WebView, whatever ticket and verifier it carries.
     @Test
-    fun redeemAndStartLinksFromOutsideAreRefused() {
+    fun redeemAndProviderLinksFromOutsideAreRefused() {
         assertEquals(Ignore, classify("$base/app_auth/redeem?ticket=$ticket&verifier=x"))
         assertEquals(Ignore, classify("$base/en/app_auth/redeem?ticket=$ticket&verifier=x"))
-        assertEquals(Ignore, classify("$base/app_auth/start?provider=strava&challenge=x"))
         assertEquals(Ignore, classify("$base/app_auth/google"))
+    }
+
+    // The app is the verified handler of all of calcpace.app: a sign-in
+    // start a browser handed over instead of loading goes back to a browser,
+    // never into the WebView.
+    @Test
+    fun aSignInStartGoesToTheBrowser() {
+        val url = "$base/app_auth/start?provider=strava&challenge=x"
+        assertEquals(BrowserTab(url), classify(url))
+        assertEquals(BrowserTab("$base/pt-BR/app_auth/start"), classify("$base/pt-BR/app_auth/start"))
+        listOf("//app_auth/start", "/en//app_auth/start", "/app_auth/start/", "/%2e/app_auth/start")
+            .forEach { assertEquals(it, Ignore, classify("$base$it?provider=strava&challenge=x")) }
     }
 
     // Round-2 review: "//app_auth/redeem" reached Rails' redeem action and

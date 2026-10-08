@@ -22,9 +22,21 @@
         android:name="android.permission.FOREGROUND_SERVICE"
         tools:node="remove" />
 
-    <!-- Health Connect as an app of its own (Android 13 and older). -->
     <queries>
+        <!-- Health Connect as an app of its own (Android 13 and older). -->
         <package android:name="com.google.android.apps.healthdata" />
+        <!-- The browsers, and which of them show Custom Tabs: calcpace.app
+             pages meant for the browser are opened in one by name, since
+             this app is the verified handler of every calcpace.app link
+             (BrowserTab). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
     </queries>
 
     <application

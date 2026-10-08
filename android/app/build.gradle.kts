@@ -67,7 +67,7 @@ android {
         applicationId = "app.calcpace.twa"
         minSdk = 28
         targetSdk = 36
-        versionCode = 3
+        versionCode = 4
         versionName = "2.0.0"
 
         // The site the app wraps. Override for a local server with

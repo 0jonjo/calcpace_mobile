@@ -1,13 +1,11 @@
 package app.calcpace.auth
 
 import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.Context
-import android.net.Uri
-import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import app.calcpace.Calcpace
+import app.calcpace.web.BrowserTab
 
 /**
  * Signing in with Google or Strava from inside the app.
@@ -18,7 +16,9 @@ import app.calcpace.Calcpace
  * 1. The site's in-app button links to /app_auth/google (or /strava);
  *    [AppAuthRouteDecisionHandler] catches it and calls [begin].
  * 2. [begin] keeps a fresh verifier and opens
- *    /app_auth/start?provider=…&challenge=… in a Custom Tab.
+ *    /app_auth/start?provider=…&challenge=… in a Custom Tab. The browser is
+ *    named ([BrowserTab]): left to Android, this calcpace.app URL would come
+ *    straight back to the app, the verified handler of every calcpace.app link.
  * 3. After the provider, the site sends the tab to
  *    https://calcpace.app/app_auth/callback?ticket=…, a verified App Link
  *    that only this signed app receives.
@@ -68,7 +68,8 @@ object AppAuth {
             .appendQueryParameter("challenge", Pkce.challengeFor(verifier))
             .build()
 
-        openInBrowserTab(activity, start)
+        // No browser at all: nothing to sign in with.
+        BrowserTab.open(activity, start, showTitle = true)
     }
 
     /**
@@ -116,17 +117,6 @@ object AppAuth {
         if (expected == null || expected != location) return false
         expectedRedeem = null
         return true
-    }
-
-    fun openInBrowserTab(activity: Activity, uri: Uri) {
-        try {
-            CustomTabsIntent.Builder()
-                .setShowTitle(true)
-                .build()
-                .launchUrl(activity, uri)
-        } catch (e: ActivityNotFoundException) {
-            // No browser at all: nothing to sign in with.
-        }
     }
 
     private fun freshVerifier(context: Context): String? {
