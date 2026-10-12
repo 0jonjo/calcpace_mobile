@@ -7,7 +7,7 @@ import org.junit.Test
 import org.w3c.dom.Element
 
 /**
- * The calcpace.app links the app claims, read from the manifest itself.
+ * The calcpace.app links the app claims, read from the manifests themselves.
  *
  * Claiming the whole site made Chrome both load an OAuth callback and hand
  * it to the app, which gave it back: the callback ran twice and the sign-in
@@ -17,35 +17,51 @@ import org.w3c.dom.Element
 class AppLinksManifestTest {
     private val android = "http://schemas.android.com/apk/res/android"
 
+    private val paths = setOf(
+        "path=/app_auth/callback",
+        "path=/email_verification",
+        "pathPattern=/.*/email_verification",
+        "pathPrefix=/passwords/",
+        "pathPattern=/.*/passwords/.*",
+    )
+
     @Test
     fun onlyTheSignInCallbackAndTheEmailLinksOpenInTheApp() {
         assertEquals(
-            setOf(
-                "scheme=https",
-                "host=calcpace.app",
-                "path=/app_auth/callback",
-                "path=/email_verification",
-                "pathPattern=/.*/email_verification",
-                "pathPrefix=/passwords/",
-                "pathPattern=/.*/passwords/.*",
-            ),
-            appLinkData(),
+            setOf("scheme=https", "host=calcpace.app") + paths,
+            viewData("src/main/AndroidManifest.xml"),
         )
     }
 
-    // One entry per <data>, its attributes in name order.
-    private fun appLinkData(): Set<String> {
-        val manifest = DocumentBuilderFactory.newInstance()
+    // The debug filter for a local server claims the same paths, so a
+    // sign-in against it behaves as in release.
+    @Test
+    fun debugBuildsClaimTheSamePathsOnTheirServer() {
+        assertEquals(
+            setOf("scheme=\${debugSiteScheme}", "host=\${debugSiteHost}") + paths,
+            viewData("src/debug/AndroidManifest.xml"),
+        )
+    }
+
+    // The one VIEW filter in [manifest], one entry per <data>, its
+    // attributes in name order.
+    private fun viewData(manifest: String): Set<String> {
+        val document = DocumentBuilderFactory.newInstance()
             .apply { isNamespaceAware = true }
             .newDocumentBuilder()
-            .parse(File("src/main/AndroidManifest.xml"))
-        val filters = manifest.getElementsByTagName("intent-filter")
-        val appLinks = (0 until filters.length)
+            .parse(File(manifest))
+        val filters = document.getElementsByTagName("intent-filter")
+        val views = (0 until filters.length)
             .map { filters.item(it) as Element }
-            .filter { it.getAttributeNS(android, "autoVerify") == "true" }
-        assertEquals(1, appLinks.size)
+            .filter { filter ->
+                val actions = filter.getElementsByTagName("action")
+                (0 until actions.length).any {
+                    (actions.item(it) as Element).getAttributeNS(android, "name") == "android.intent.action.VIEW"
+                }
+            }
+        assertEquals(1, views.size)
 
-        val data = appLinks.single().getElementsByTagName("data")
+        val data = views.single().getElementsByTagName("data")
         return (0 until data.length).map { i ->
             val attributes = (data.item(i) as Element).attributes
             (0 until attributes.length).map { attributes.item(it) }

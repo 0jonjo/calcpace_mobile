@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Debug builds may point at a local Rails server over plain HTTP, and
-     accept that server's links the way release accepts calcpace.app's. -->
+     accept that server's links the way release accepts calcpace.app's:
+     the same paths, so a sign-in against it behaves as in release. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- HcSeedActivity writes made-up runs to Health Connect for testing
@@ -20,9 +21,13 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:host="${debugSiteHost}"
-                    android:scheme="${debugSiteScheme}" />
+                <data android:scheme="${debugSiteScheme}" />
+                <data android:host="${debugSiteHost}" />
+                <data android:path="/app_auth/callback" />
+                <data android:path="/email_verification" />
+                <data android:pathPattern="/.*/email_verification" />
+                <data android:pathPrefix="/passwords/" />
+                <data android:pathPattern="/.*/passwords/.*" />
             </intent-filter>
         </activity>
 
