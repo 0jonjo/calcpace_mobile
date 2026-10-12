@@ -8,10 +8,11 @@ import java.net.URLDecoder
  * What a link that Android hands to the app (an App Link tapped somewhere
  * else, or the end of a sign-in in the browser tab) is allowed to do.
  *
- * Every calcpace.app path opens in the app, but not every path may be
- * loaded into the WebView from outside: /app_auth/redeem signs the WebView
- * in, so a redeem link mailed by an attacker would sign the victim into the
- * attacker's account. Only [app.calcpace.auth.AppAuth] builds redeem URLs;
+ * The manifest claims only a few calcpace.app paths, but any app can start
+ * this activity with any URL, so not every path may be loaded into the
+ * WebView from outside: /app_auth/redeem signs the WebView in, so a redeem
+ * link mailed by an attacker would sign the victim into the attacker's
+ * account. Only [app.calcpace.auth.AppAuth] builds redeem URLs;
  * from outside, the one app_auth path accepted is the exact callback.
  *
  * Kept free of Android types so the rules are unit tested on the JVM.

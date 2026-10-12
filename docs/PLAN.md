@@ -8,7 +8,7 @@ Replace the Trusted Web Activity without anyone losing anything.
 
 - [x] Hotwire Native shell (1.3.1), single navigator, the site draws its own header and tab bar
 - [x] Same `applicationId` (`app.calcpace.twa`), same icon, `versionCode` 3
-- [x] calcpace.app App Links open in the app (assetlinks already serve the package)
+- [x] calcpace.app App Links open in the app (assetlinks already serve the package). Since 2.0.1 only the sign-in callback and the email links (address verification, password reset): claiming the whole site made Chrome run the Google/Strava callback twice and the sign-in failed
 - [x] External links open in a Custom Tab; `mailto:`/`tel:` go to the system
 - [x] Edge-to-edge: the page stays clear of the status bar, gesture bar and keyboard
 - [x] Google/Strava sign-in through a Custom Tab with a PKCE-bound one-time ticket, handed back by a verified App Link (`/app_auth/callback`); outside links can't load `/app_auth/*` into the WebView, however the path is spelled

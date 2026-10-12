@@ -26,8 +26,7 @@
         <!-- Health Connect as an app of its own (Android 13 and older). -->
         <package android:name="com.google.android.apps.healthdata" />
         <!-- The browsers, and which of them show Custom Tabs: calcpace.app
-             pages meant for the browser are opened in one by name, since
-             this app is the verified handler of every calcpace.app link
+             pages meant for the browser are opened in one by name
              (BrowserTab). -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -70,16 +69,33 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- calcpace.app links open in the app, as they did in the TWA,
-                 verified by /.well-known/assetlinks.json on the site. This is
-                 also how a sign-in comes back from the browser tab
-                 (/app_auth/callback): only this signed app receives it.
-                 IncomingLink decides what each path may do. -->
+            <!-- The calcpace.app links that open in the app, verified by
+                 /.well-known/assetlinks.json on the site: the end of a
+                 sign-in in the browser tab (/app_auth/callback, which only
+                 this signed app receives) and the email links (verify the
+                 address, reset the password). Everything else opens in the
+                 browser. Claiming the whole site made Chrome both load a
+                 Google or Strava callback and hand it to the app, which gave
+                 it back: the callback ran twice and the sign-in failed.
+                 IncomingLink decides what each path may do.
+
+                 pathPattern is not a regex: ".*" stops at the first match of
+                 the character after it and never backtracks, so
+                 ".*/email_verification" would miss "/pt-BR/email_verification".
+                 "/.*/…" is one locale segment; the bare path is listed apart.
+                 The sign-in callback never carries a locale.
+                 AppLinksManifestTest holds this list. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="calcpace.app" />
+                <data android:scheme="https" />
+                <data android:host="calcpace.app" />
+                <data android:path="/app_auth/callback" />
+                <data android:path="/email_verification" />
+                <data android:pathPattern="/.*/email_verification" />
+                <data android:pathPrefix="/passwords/" />
+                <data android:pathPattern="/.*/passwords/.*" />
             </intent-filter>
 
         </activity>

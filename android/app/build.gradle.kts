@@ -67,8 +67,8 @@ android {
         applicationId = "app.calcpace.twa"
         minSdk = 28
         targetSdk = 36
-        versionCode = 4
-        versionName = "2.0.0"
+        versionCode = 5
+        versionName = "2.0.1"
 
         // The site the app wraps. Override for a local server with
         // ./gradlew installDebug -Pcalcpace.baseUrl=http://192.168.0.10:3001
