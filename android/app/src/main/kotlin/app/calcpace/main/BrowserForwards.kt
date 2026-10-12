@@ -11,6 +11,10 @@ package app.calcpace.main
  * bounce, never something the athlete did (each step carries a fresh
  * OAuth code and state).
  *
+ * The manifest no longer claims provider steps, so a browser has no reason
+ * to hand one to the app; this stays as a safety net for one that arrives
+ * some other way.
+ *
  * Kept free of Android types so the rules are unit tested on the JVM.
  */
 class BrowserForwards(private val windowMs: Long = 10_000L) {

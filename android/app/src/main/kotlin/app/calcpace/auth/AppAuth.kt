@@ -16,9 +16,8 @@ import app.calcpace.web.BrowserTab
  * 1. The site's in-app button links to /app_auth/google (or /strava);
  *    [AppAuthRouteDecisionHandler] catches it and calls [begin].
  * 2. [begin] keeps a fresh verifier and opens
- *    /app_auth/start?provider=…&challenge=… in a Custom Tab. The browser is
- *    named ([BrowserTab]): left to Android, this calcpace.app URL would come
- *    straight back to the app, the verified handler of every calcpace.app link.
+ *    /app_auth/start?provider=…&challenge=… in a Custom Tab, in a named
+ *    browser ([BrowserTab]).
  * 3. After the provider, the site sends the tab to
  *    https://calcpace.app/app_auth/callback?ticket=…, a verified App Link
  *    that only this signed app receives.

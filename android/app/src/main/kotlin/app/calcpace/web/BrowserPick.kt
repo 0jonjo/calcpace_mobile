@@ -5,11 +5,13 @@ package app.calcpace.web
  * sign-in's /app_auth/start, a provider step handed back to the tab, the
  * privacy policy from Health Connect.
  *
- * This app is the verified App Link handler for every calcpace.app URL, so
- * a Custom Tab launched without a package resolves to the app itself, which
- * refuses those pages, and nothing opens. So a browser is always named: the
- * default one when it can show a Custom Tab, else the first that can, else a
- * plain browser window, and never this app.
+ * A Custom Tab launched without a package opens in whatever handles the
+ * URL. While this app claimed every calcpace.app link that was the app
+ * itself, which refuses those pages, and nothing opened. It now claims only
+ * the sign-in callback and the email links (the manifest), but a page meant
+ * for the browser shouldn't depend on that list, so a browser is always
+ * named: the default one when it can show a Custom Tab, else the first that
+ * can, else a plain browser window, and never this app.
  *
  * Kept free of Android types so the rules are unit tested on the JVM.
  */
