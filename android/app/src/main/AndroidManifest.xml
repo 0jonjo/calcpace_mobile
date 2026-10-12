@@ -82,7 +82,7 @@
                  pathPattern is not a regex: ".*" stops at the first match of
                  the character after it and never backtracks, so
                  ".*/email_verification" would miss "/pt-BR/email_verification".
-                 "/.*/…" is one locale segment; the bare path is listed apart.
+                 "/.*/…" is one segment (the locale); the bare path is listed apart.
                  The sign-in callback never carries a locale.
                  AppLinksManifestTest holds this list. -->
             <intent-filter android:autoVerify="true">

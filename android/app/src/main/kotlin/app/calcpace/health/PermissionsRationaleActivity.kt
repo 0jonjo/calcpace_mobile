@@ -12,8 +12,8 @@ import java.util.Locale
  * permission usage screen): the site's privacy policy, at its Health Connect
  * section, in the phone's language. The page the Play listing links to, so
  * there is one policy. Nothing is drawn here; it hands over and goes. In a
- * named browser ([BrowserTab]): this calcpace.app link would otherwise open
- * the app instead of the page.
+ * named browser ([BrowserTab]), so it never depends on which calcpace.app
+ * links the app claims.
  */
 class PermissionsRationaleActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
