@@ -73,6 +73,8 @@ adb logcat -s HcSeed HcSync                                         # the seeded
 
 The first run asks for the write permissions; run the command again after allowing them. Seeded sessions come from the app's own package (unknown to the site, so no app name) on a made-up "Calcpace Seed Watch": the site shows "via Health Connect · Calcpace Seed Watch".
 
+Debug builds also install a second launcher icon, **HC Probe**, that lists what Health Connect holds for each session of the last 30 days beyond the totals the import reads: laps, segments, the route (through Health Connect's per-session dialog) and the heart rate, speed, cadence, power, steps, calories and VO2max records, with the app each came from. It saves and sends nothing; "Share report" hands the text to any app. For it, debug builds declare seven more read permissions (`READ_SPEED`, `READ_STEPS`, `READ_POWER`, `READ_ACTIVE_CALORIES_BURNED`, `READ_TOTAL_CALORIES_BURNED`, `READ_VO2_MAX`, `READ_EXERCISE_ROUTES`); release declares none of them.
+
 ## Roadmap
 
 See [`docs/PLAN.md`](docs/PLAN.md).
