@@ -50,9 +50,12 @@
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- Its own launcher icon, so it runs on a phone without adb. -->
+        <!-- Its own launcher icon, so it runs on a phone without adb. Not
+             recreated on rotation: that would read everything again and
+             drop the answer of an open route dialog. -->
         <activity
             android:name="app.calcpace.health.HcProbeActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true"
             android:label="HC Probe"
             android:taskAffinity="app.calcpace.probe"

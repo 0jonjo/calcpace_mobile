@@ -38,6 +38,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.reflect.KClass
 import kotlinx.coroutines.launch
 
@@ -57,6 +58,7 @@ import kotlinx.coroutines.launch
 class HcProbeActivity : ComponentActivity() {
     private lateinit var list: LinearLayout
     private lateinit var status: TextView
+    private lateinit var shareButton: Button
     private val reports = linkedMapOf<String, StringBuilder>()
     private val views = mutableMapOf<String, TextView>()
     private var pendingRoute: String? = null
@@ -74,15 +76,19 @@ class HcProbeActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         status = TextView(this).apply { textSize = 14f }
-        val share = Button(this).apply {
+        // Off until every session is read: the chooser (like the route
+        // dialog) would put the probe in the background, where Health
+        // Connect refuses the reads still to come.
+        shareButton = Button(this).apply {
             text = "Share report"
+            isEnabled = false
             setOnClickListener { share() }
         }
         list = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 24, 24, 24)
             addView(status)
-            addView(share)
+            addView(shareButton)
         }
         val root = ScrollView(this).apply { addView(list) }
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
@@ -113,9 +119,15 @@ class HcProbeActivity : ComponentActivity() {
                         (if (missing.isEmpty()) "" else "\nNot granted: " + missing.joinToString { it.substringAfterLast('.') })
                 )
                 sessions.forEach { session(client, it, granted) }
+                sessions.filter { it.exerciseRouteResult is ExerciseRouteResult.ConsentRequired }
+                    .forEach { addRouteButton(it.metadata.id) }
+                say(status.text.toString() + "\nDone.")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 say("failed: $e")
             }
+            shareButton.isEnabled = true
         }
     }
 
@@ -153,11 +165,14 @@ class HcProbeActivity : ComponentActivity() {
             }
         )
 
-        // Every app that wrote this kind of record inside the session, not
-        // only the session's own: a phone app may record the run while the
-        // watch's own app writes the heart rate.
-        val window = TimeRangeFilter.between(session.startTime, session.endTime)
+        // Records that overlap the session, from every app, not only the
+        // session's own: a phone app may record the run while the watch's
+        // own app writes the heart rate. Overlap, not ownership: an app's
+        // hourly steps or calories count whole. VO2max is written once the
+        // run is over, so its window runs two hours past the end.
         SERIES.forEach { (name, type) ->
+            val end = if (type == Vo2MaxRecord::class) session.endTime.plus(Duration.ofHours(2)) else session.endTime
+            val window = TimeRangeFilter.between(session.startTime, end)
             if (HealthPermission.getReadPermission(type) !in granted) {
                 report.appendLine("  $name: not granted")
                 return@forEach
@@ -169,22 +184,26 @@ class HcProbeActivity : ComponentActivity() {
                     val own = if (origin == session.metadata.dataOrigin.packageName) "" else " (other app)"
                     "$origin$own ${list.size} rec" + samples(list) + total(list)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                "failed: ${e.javaClass.simpleName}"
+                "failed: ${e.javaClass.simpleName}: ${e.message}"
             }
             report.appendLine("  $name: $line")
         }
         render(id)
+    }
 
-        if (session.exerciseRouteResult is ExerciseRouteResult.ConsentRequired) {
-            list.addView(Button(this).apply {
-                text = "Ask for route"
-                setOnClickListener {
-                    pendingRoute = id
-                    routeRequest.launch(id)
-                }
-            })
-        }
+    // Right under the session's text, once every session is read.
+    private fun addRouteButton(id: String) {
+        val view = views[id] ?: return
+        list.addView(Button(this).apply {
+            text = "Ask for route"
+            setOnClickListener {
+                pendingRoute = id
+                routeRequest.launch(id)
+            }
+        }, list.indexOfChild(view) + 1)
     }
 
     private fun samples(records: List<Record>): String {
@@ -216,7 +235,8 @@ class HcProbeActivity : ComponentActivity() {
         val altitude = points.count { it.altitude != null }
         val accuracy = points.count { it.horizontalAccuracy != null }
         val gap = points.zipWithNext { a, b -> Duration.between(a.time, b.time).seconds }.average()
-        return "${points.size} points, every ~%.0fs, altitude on $altitude, accuracy on $accuracy".format(gap)
+        val every = if (gap.isNaN()) "" else ", every ~%.0fs".format(gap)
+        return "${points.size} points$every, altitude on $altitude, accuracy on $accuracy"
     }
 
     private suspend fun <T : Record> readAll(client: HealthConnectClient, type: KClass<T>, window: TimeRangeFilter): List<T> {
