@@ -2,12 +2,26 @@
 <!-- Debug builds may point at a local Rails server over plain HTTP, and
      accept that server's links the way release accepts calcpace.app's:
      the same paths, so a sign-in against it behaves as in release. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- HcSeedActivity writes made-up runs to Health Connect for testing
          the import on an emulator. Debug builds only: a release build never
          asks to write anything. -->
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+
+    <!-- The run recorder (G0, recorder/): GPS in a foreground service of
+         type location. Debug builds only until it goes to the testers: a
+         release build asks for no location and declares no foreground
+         service to Play. The main manifest removes FOREGROUND_SERVICE (it
+         came from WorkManager); this puts it back for debug. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="replace" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_ELEVATION_GAINED" />
@@ -38,5 +52,27 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Its own launcher icon, so the recorder is one tap away on a run.
+             Portrait and not recreated on rotation: a pocket turns the phone. -->
+        <activity
+            android:name="app.calcpace.recorder.RecorderActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
+            android:label="Record run"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:taskAffinity="app.calcpace.recorder"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="app.calcpace.recorder.RecorderService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
     </application>
 </manifest>

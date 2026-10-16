@@ -43,6 +43,8 @@ cd android
 
 Debug builds install as `app.calcpace.twa.debug`, next to the Play version.
 
+Debug builds also carry the run recorder (G0, [`recorder/`](android/app/src/debug/kotlin/app/calcpace/recorder)), with its own launcher icon, "Record run": GPS in a foreground service of type location, the run logged line by line (`files/recorder/current.log`) so a killed process resumes from it, and the finished run saved as GPX in Downloads/Calcpace for the site's run form. The location and foreground-service permissions are in the debug manifest only; a release build declares neither. The plan and its pass mark (no run lost, distance within 2%) are in `calcpace_docs/plans/calcpace_gravador_plan.md`.
+
 Push notifications need Firebase options, read at build time from a `google-services.json` that never enters the repo (it is public): `~/.config/calcpace/google-services.json` by default, or `-Pcalcpace.googleServices=/path/to/google-services.json` (a relative path resolves against `android/`). Without the file the app builds and runs with push off (the bridge reports `unavailable`); that is how CI builds it. A release build fails without it, and an unreadable file fails any build. The file only knows the real package, so a default debug build (`app.calcpace.twa.debug`) also reports `unavailable`: test push on a debug build with `-Pcalcpace.debugIdSuffix=`. Release signing reads a properties file that stays out of the repo (`~/.calcpace/signing.properties`, or a path in `CALCPACE_SIGNING`) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`.
 
 ### Health Connect
