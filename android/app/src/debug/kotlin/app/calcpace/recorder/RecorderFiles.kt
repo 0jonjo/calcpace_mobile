@@ -9,6 +9,7 @@ import android.provider.MediaStore
 import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 /**
  * Where a run lives on the phone. While it is on: `files/recorder/current.log`
@@ -67,7 +68,10 @@ class RecorderFiles(context: Context) {
         val name = Gpx.filename(track.startedAt ?: System.currentTimeMillis())
         val gpx = Gpx.write(track, "Run")
         File(runs, name).writeText(gpx)
-        current.renameTo(File(runs, name.removeSuffix(".gpx") + ".log"))
+        // Unmoved, the old log would take the next run's events after its Stop.
+        if (!current.renameTo(File(runs, name.removeSuffix(".gpx") + ".log"))) {
+            throw IOException("Could not move ${current.name} to runs/")
+        }
         return Finished(name, toDownloads(name, gpx))
     }
 
@@ -87,7 +91,13 @@ class RecorderFiles(context: Context) {
         }
         val resolver = app.contentResolver
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
-        resolver.openOutputStream(uri)?.use { it.write(gpx.toByteArray()) } ?: return null
+        try {
+            resolver.openOutputStream(uri)?.use { it.write(gpx.toByteArray()) } ?: throw IOException("No stream")
+        } catch (e: Exception) {
+            // An empty file in Downloads is one the run form could pick.
+            resolver.delete(uri, null, null)
+            throw e
+        }
         return uri
     }
 

@@ -8,15 +8,17 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RunLogTest {
+    private val T = 1_760_000_000_000L
+
     @Test
     fun everyEventSurvivesTheRoundTrip() {
         val events = listOf(
-            RunEvent.Start(1000),
-            RunEvent.Fix(2000, -5.8400001, -35.2000002, 31.5, 4.5f),
-            RunEvent.Fix(3000, 51.5, -0.1, null, 12f),
-            RunEvent.Pause(4000),
-            RunEvent.Resume(5000),
-            RunEvent.Stop(6000),
+            RunEvent.Start(T + 1000),
+            RunEvent.Fix(T + 2000, -5.8400001, -35.2000002, 31.5, 4.5f),
+            RunEvent.Fix(T + 3000, 51.5, -0.1, null, 12f),
+            RunEvent.Pause(T + 4000),
+            RunEvent.Resume(T + 5000),
+            RunEvent.Stop(T + 6000),
         )
 
         assertEquals(events, RunLog.parse(events.joinToString("\n", transform = RunLog::line)))
@@ -25,14 +27,14 @@ class RunLogTest {
     // The process was killed in the middle of a write.
     @Test
     fun aCutOffLastLineIsSkipped() {
-        val text = "S,1000\nF,2000,-5.84,-35.2,,5.0\nF,3000,-5.8"
-        assertEquals(listOf(RunEvent.Start(1000), RunEvent.Fix(2000, -5.84, -35.2, null, 5f)), RunLog.parse(text))
+        val text = "S,${T + 1000}\nF,${T + 2000},-5.84,-35.2,,5.0\nF,${T + 3000},-5.8"
+        assertEquals(listOf(RunEvent.Start(T + 1000), RunEvent.Fix(T + 2000, -5.84, -35.2, null, 5f)), RunLog.parse(text))
     }
 
     @Test
     fun linesThatDoNotHoldUpAreSkipped() {
         listOf(
-            "", "X,1", "S", "S,abc", "S,1,2", "F,1,91,0,,5", "F,1,0,181,,5", "F,1,0,0,x,5", "F,1,0,0,,", "F,1,0,0,,5,9",
+            "", "X,1", "S", "S,abc", "S,1,2", "S,17", "R,1760000", "F,1700,0,0,,5", "F,1,91,0,,5", "F,1,0,181,,5", "F,1,0,0,x,5", "F,1,0,0,,", "F,1,0,0,,5,9",
         ).forEach { assertNull(it, RunLog.parseLine(it)) }
     }
 
@@ -43,7 +45,7 @@ class RunLogTest {
         val previous = Locale.getDefault()
         Locale.setDefault(Locale.GERMANY)
         try {
-            assertEquals("F,1,-5.8400000,-35.2000000,10.5,3.5", RunLog.line(RunEvent.Fix(1, -5.84, -35.2, 10.5, 3.5f)))
+            assertEquals("F,$T,-5.8400000,-35.2000000,10.5,3.5", RunLog.line(RunEvent.Fix(T, -5.84, -35.2, 10.5, 3.5f)))
         } finally {
             Locale.setDefault(previous)
         }

@@ -31,6 +31,8 @@ sealed interface RunEvent {
 }
 
 object RunLog {
+    private const val MIN_TIME = 1_000_000_000_000L
+
     fun line(event: RunEvent): String = when (event) {
         is RunEvent.Start -> "S,${event.time}"
         is RunEvent.Pause -> "P,${event.time}"
@@ -48,7 +50,8 @@ object RunLog {
 
     fun parseLine(line: String): RunEvent? {
         val parts = line.trim().split(',')
-        val time = parts.getOrNull(1)?.toLongOrNull() ?: return null
+        // A torn line can still parse ("S,17"): a time before 2001 is one.
+        val time = parts.getOrNull(1)?.toLongOrNull()?.takeIf { it >= MIN_TIME } ?: return null
         return when (parts[0]) {
             "S" -> if (parts.size == 2) RunEvent.Start(time) else null
             "P" -> if (parts.size == 2) RunEvent.Pause(time) else null

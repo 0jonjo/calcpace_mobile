@@ -74,7 +74,12 @@ class RecorderService : Service(), LocationListener {
                 // A stopped run whose saving was cut short: save it first,
                 // then begin. Without this its Stop would make every Start a
                 // no-op.
-                if (track.isStopped) save()
+                if (track.isStopped && !save()) {
+                    // Still unsaved: show why and leave, rather than sit in
+                    // the foreground saying "Recording" with nothing to record.
+                    stop()
+                    return START_NOT_STICKY
+                }
                 when {
                     track.startedAt == null -> record(RunEvent.Start(now))
                     track.isPaused -> record(RunEvent.Resume(now))
@@ -157,16 +162,17 @@ class RecorderService : Service(), LocationListener {
      * beginning a run: a new Start appended after the old one would be
      * ignored when the log is read back.
      */
-    private fun save() {
+    private fun save(): Boolean {
         val finished = try {
             files.finish(track)
         } catch (e: Exception) {
             Log.e(TAG, "Could not save the run: $e")
             state.value = Snapshot(track, RecorderFiles.Finished(name = null, download = null), ++version)
-            return
+            return false
         }
         state.value = Snapshot(track, finished, ++version)
         track = Track()
+        return true
     }
 
     private fun notifyStopped() {
