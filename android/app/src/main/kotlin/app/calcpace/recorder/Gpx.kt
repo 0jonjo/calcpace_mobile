@@ -16,7 +16,7 @@ import java.util.Locale
  * until it learns to leave the gaps out (the same as an adidas file today).
  */
 object Gpx {
-    private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'").withZone(ZoneOffset.UTC)
+    private val TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
 
     fun write(track: Track, name: String): String = buildString {
         append("""<?xml version="1.0" encoding="UTF-8"?>""").append('\n')
@@ -38,9 +38,10 @@ object Gpx {
         append("</gpx>\n")
     }
 
-    /** The runner's local time, which is how they remember the run. */
+    /** The runner's local time, which is how they remember the run; to the
+     *  second, so two runs started in the same minute keep both files. */
     fun filename(startedAt: Long, zone: ZoneId = ZoneId.systemDefault()): String =
-        "calcpace-" + DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmm").withZone(zone)
+        "calcpace-" + DateTimeFormatter.ofPattern("yyyy-MM-dd-HHmmss").withZone(zone)
             .format(Instant.ofEpochMilli(startedAt)) + ".gpx"
 
     private fun time(epochMillis: Long): String = TIME.format(Instant.ofEpochMilli(epochMillis))

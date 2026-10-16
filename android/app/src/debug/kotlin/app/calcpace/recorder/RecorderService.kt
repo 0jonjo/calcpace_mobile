@@ -61,14 +61,24 @@ class RecorderService : Service(), LocationListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (!goForeground()) {
+            // Android refused a location service started without the app on
+            // screen (a restart after a kill, screen off). Say so, or the run
+            // goes on without GPS until the runner happens to look.
+            if (track.startedAt != null && !track.isStopped) notifyStopped()
             stopSelf()
             return START_NOT_STICKY
         }
         val now = System.currentTimeMillis()
         when (intent?.action) {
-            ACTION_START -> when {
-                track.startedAt == null -> record(RunEvent.Start(now))
-                track.isPaused -> record(RunEvent.Resume(now))
+            ACTION_START -> {
+                // A stopped run whose saving was cut short: save it first,
+                // then begin. Without this its Stop would make every Start a
+                // no-op.
+                if (track.isStopped) save()
+                when {
+                    track.startedAt == null -> record(RunEvent.Start(now))
+                    track.isPaused -> record(RunEvent.Resume(now))
+                }
             }
             ACTION_PAUSE -> if (track.isRunning) record(RunEvent.Pause(now))
             ACTION_RESUME -> if (track.isPaused) record(RunEvent.Resume(now))
@@ -79,6 +89,7 @@ class RecorderService : Service(), LocationListener {
             }
             // A restart after a kill, or anything unknown: carry on from the log.
             else -> if (track.startedAt == null || track.isStopped) {
+                if (track.isStopped) save()
                 stop()
                 return START_NOT_STICKY
             }
@@ -116,7 +127,9 @@ class RecorderService : Service(), LocationListener {
         if (!track.isRunning) return
         record(
             RunEvent.Fix(
-                time = System.currentTimeMillis(),
+                // The GPS's own time: fixes delivered in a batch keep their
+                // spacing, which the jump check and the GPX depend on.
+                time = location.time.takeIf { it > 0 } ?: System.currentTimeMillis(),
                 lat = location.latitude,
                 lon = location.longitude,
                 altitude = if (location.hasAltitude()) location.altitude else null,
@@ -133,10 +146,46 @@ class RecorderService : Service(), LocationListener {
 
     private fun finish() {
         getSystemService(LocationManager::class.java).removeUpdates(this)
-        val finished = if (track.startedAt != null) files.finish(track) else null
+        // A second Stop finds nothing to save: keep the "saved" screen.
+        if (track.startedAt != null) save()
+        stop()
+    }
+
+    /**
+     * Saves the stopped [track] and starts afresh. On failure the track stays
+     * stopped, as it is in the log, so the next Start tries again before
+     * beginning a run: a new Start appended after the old one would be
+     * ignored when the log is read back.
+     */
+    private fun save() {
+        val finished = try {
+            files.finish(track)
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not save the run: $e")
+            state.value = Snapshot(track, RecorderFiles.Finished(name = null, download = null), ++version)
+            return
+        }
         state.value = Snapshot(track, finished, ++version)
         track = Track()
-        stop()
+    }
+
+    private fun notifyStopped() {
+        channel()
+        val open = PendingIntent.getActivity(
+            this, 0, Intent(this, RecorderActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+        getSystemService(NotificationManager::class.java).notify(
+            NOTIFICATION_ID + 1,
+            NotificationCompat.Builder(this, ALERT_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_dialog_alert)
+                .setContentTitle("Recording stopped")
+                .setContentText("The phone stopped the recorder. Tap to resume the run.")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(open)
+                .build()
+        )
     }
 
     private fun stop() {
@@ -183,9 +232,9 @@ class RecorderService : Service(), LocationListener {
     }
 
     private fun channel() {
-        getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL, "Run recording", NotificationManager.IMPORTANCE_LOW)
-        )
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(NotificationChannel(CHANNEL, "Run recording", NotificationManager.IMPORTANCE_LOW))
+        manager.createNotificationChannel(NotificationChannel(ALERT_CHANNEL, "Recording stopped", NotificationManager.IMPORTANCE_HIGH))
     }
 
     private fun notification(): Notification {
@@ -219,6 +268,7 @@ class RecorderService : Service(), LocationListener {
     companion object {
         private const val TAG = "Recorder"
         private const val CHANNEL = "recorder"
+        private const val ALERT_CHANNEL = "recorder_alert"
         private const val NOTIFICATION_ID = 4101
         private const val NOTIFICATION_EVERY_MS = 5_000L
         private const val NO_ACCURACY = 999f

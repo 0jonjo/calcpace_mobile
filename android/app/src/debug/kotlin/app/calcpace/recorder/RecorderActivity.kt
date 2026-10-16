@@ -155,7 +155,9 @@ class RecorderActivity : ComponentActivity() {
         pace.text = RunFormat.pace(track?.averagePace(now))
 
         status.text = when {
-            finished != null -> "Saved: Downloads/Calcpace/${finished.name}"
+            finished != null && finished.name == null -> "Could not save the run. It is kept: tap Start to try again."
+            finished?.download != null -> "Saved: Downloads/Calcpace/${finished.name}"
+            finished != null -> "Saved in the app only (no copy in Downloads): ${finished.name}"
             orphan -> "The recorder was stopped by the phone. Resume or stop and save."
             track?.isRunning == true -> "Recording · GPS ±${track.lastAccuracy?.toInt() ?: "–"} m"
             track?.isPaused == true -> "Paused"

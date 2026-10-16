@@ -67,14 +67,14 @@ class RunLogTest {
 
         assertEquals(2, Regex("<trkseg>").findAll(gpx).count())
         assertEquals(3, Regex("<trkpt ").findAll(gpx).count())
-        assertTrue(gpx.contains("""<trkpt lat="1.0000000" lon="2.0000000"><ele>10.0</ele><time>2025-10-09T08:53:20Z</time></trkpt>"""))
+        assertTrue(gpx.contains("""<trkpt lat="1.0000000" lon="2.0000000"><ele>10.0</ele><time>2025-10-09T08:53:20.000Z</time></trkpt>"""))
         assertTrue(gpx.contains("<name>Run &lt;1&gt; &amp; co</name>"))
         assertTrue(gpx.contains("<type>running</type>"))
     }
 
     @Test
     fun theFileIsNamedInTheRunnersTime() {
-        assertEquals("calcpace-2025-10-09-0553.gpx", Gpx.filename(1_760_000_000_000L, ZoneId.of("America/Sao_Paulo")))
+        assertEquals("calcpace-2025-10-09-055320.gpx", Gpx.filename(1_760_000_000_000L, ZoneId.of("America/Sao_Paulo")))
     }
 
     @Test
