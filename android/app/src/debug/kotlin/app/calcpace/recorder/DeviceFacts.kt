@@ -42,6 +42,8 @@ object DeviceFacts {
     }
 
     private fun bucket(value: Int) = when (value) {
+        // STANDBY_BUCKET_EXEMPTED is hidden API: the battery-optimization whitelist.
+        5 -> "exempted"
         UsageStatsManager.STANDBY_BUCKET_ACTIVE -> "active"
         UsageStatsManager.STANDBY_BUCKET_WORKING_SET -> "working set"
         UsageStatsManager.STANDBY_BUCKET_FREQUENT -> "frequent"

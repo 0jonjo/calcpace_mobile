@@ -69,6 +69,37 @@ class DiagReportTest {
         assertEquals(null, silences.first().steps)
     }
 
+    // The phone's counter runs from boot; a reboot starts it again from 0.
+    @Test
+    fun stepsAreTheCountersDifferencesAcrossAReboot() {
+        val lines = DiagReport.parse(listOf(at(1, "STEP", 5000), at(2, "STEP", 5010), at(3, "STEP", 4), at(4, "STEP", 9)).joinToString("\n"))
+
+        assertEquals(listOf(0L, 10L, 14L, 19L), DiagReport.steps(lines).map { it.second })
+    }
+
+    // Stopped from a fresh process after a kill: no RUN stop in the readings.
+    @Test
+    fun aSilenceUpToAStopTheReadingsMissedCounts() {
+        val lines = DiagReport.parse(listOf(at(0, "RUN", "start"), gps(1), gps(2), at(3, "STEP", 100)).joinToString("\n"))
+
+        val silence = DiagReport.silences(lines, stoppedAt = t0 + 200_000).single()
+
+        assertEquals(t0 + 2_000 to t0 + 200_000, silence.from to silence.to)
+        // A counter that said nothing meanwhile: none taken, not unknown.
+        assertEquals(0, silence.steps)
+    }
+
+    // A batch delivered late keeps the fixes' own spacing: no silence.
+    @Test
+    fun fixesDeliveredLateInABatchAreNoSilence() {
+        val late = (1..20).map { second ->
+            at(25, "GPS", t0 + second * 1000L, "-5.8573418", "-35.2061699", "38.00", "4.00", "", "", "", "", "0")
+        }
+        val lines = DiagReport.parse((listOf(at(0, "RUN", "start")) + late + at(26, "RUN", "stop")).joinToString("\n"))
+
+        assertTrue(DiagReport.silences(lines).isEmpty())
+    }
+
     @Test
     fun aTornOrForeignLineIsSkipped() {
         val lines = DiagReport.parse("garbage\n${t0},RUN,start\n17600000\n${t0 + 1},GPS,")

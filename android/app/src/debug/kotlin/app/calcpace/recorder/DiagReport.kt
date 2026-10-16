@@ -37,46 +37,70 @@ object DiagReport {
 
     /**
      * Gaps between GPS fixes longer than [SILENCE_MS] while the run was
-     * running: a pause turns the GPS off on purpose, so a gap that holds a
-     * pause is not one. The run's start and stop count as the edges.
+     * running, by the fixes' own times (as the [Track] counts them, and
+     * unmoved by fixes delivered late in a batch): a pause turns the GPS off
+     * on purpose, so a gap that holds a pause is not one. The run's start and
+     * stop are the edges; [stoppedAt] closes a run whose stop the readings
+     * missed (stopped from a fresh process after a kill).
      */
-    fun silences(lines: List<Line>): List<Silence> {
+    fun silences(lines: List<Line>, stoppedAt: Long? = null): List<Silence> {
         val result = mutableListOf<Silence>()
+        val steps = steps(lines)
         var running = false
         var lastFix: Long? = null
         var screenOff = false
+        fun close(at: Long) {
+            lastFix?.takeIf { running && at - it > SILENCE_MS }?.let { result += silence(lines, steps, it, at, screenOff) }
+        }
         for (line in lines) {
             when (line.kind) {
                 "RUN" -> when (line.fields.firstOrNull()) {
                     "start", "resume" -> { running = true; lastFix = line.time }
                     "pause", "stop" -> {
-                        lastFix?.takeIf { running && line.time - it > SILENCE_MS }?.let { result += silence(lines, it, line.time, screenOff) }
+                        close(line.time)
                         running = false
                         lastFix = null
                     }
                 }
                 "SCREEN" -> screenOff = line.fields.firstOrNull() == "off"
                 "GPS" -> if (running) {
-                    lastFix?.takeIf { line.time - it > SILENCE_MS }?.let { result += silence(lines, it, line.time, screenOff) }
-                    lastFix = line.time
+                    val fixTime = line.fields.firstOrNull()?.toLongOrNull() ?: line.time
+                    close(fixTime)
+                    lastFix = maxOf(lastFix ?: fixTime, fixTime)
                 }
             }
         }
+        stoppedAt?.let(::close)
         return result
     }
 
-    private fun silence(lines: List<Line>, from: Long, to: Long, screenOffAtStart: Boolean): Silence {
+    /**
+     * The step count since the first reading, at each STEP line. The phone's
+     * counter runs from its boot, so differences are what count; a counter
+     * that went down is a reboot, starting again from 0.
+     */
+    fun steps(lines: List<Line>): List<Pair<Long, Long>> {
+        var total = 0L
+        var previous: Long? = null
+        return lines.filter { it.kind == "STEP" }.mapNotNull { line ->
+            val raw = line.fields.firstOrNull()?.toLongOrNull() ?: return@mapNotNull null
+            previous?.let { total += if (raw >= it) raw - it else raw }
+            previous = raw
+            line.time to total
+        }
+    }
+
+    private fun stepsAt(steps: List<Pair<Long, Long>>, time: Long) = steps.lastOrNull { it.first <= time }?.second ?: 0L
+
+    private fun silence(lines: List<Line>, steps: List<Pair<Long, Long>>, from: Long, to: Long, screenOffAtStart: Boolean): Silence {
         val inside = lines.filter { it.time in from..to }
-        fun stepsOf(line: Line?) = line?.fields?.firstOrNull()?.toIntOrNull()
-        // Counted from the run's start: no reading before the silence is 0.
-        val before = stepsOf(lines.lastOrNull { it.kind == "STEP" && it.time <= from }) ?: 0
-        val steps = stepsOf(inside.lastOrNull { it.kind == "STEP" })?.minus(before)
         return Silence(
             from = from,
             to = to,
             screenOff = screenOffAtStart || inside.any { it.kind == "SCREEN" && it.fields.firstOrNull() == "off" },
             fusedFixes = inside.count { it.kind == "FUSED" },
-            steps = steps,
+            // No counter, no number; a counter that said nothing meanwhile, 0.
+            steps = if (steps.isEmpty()) null else (stepsAt(steps, to) - stepsAt(steps, from)).toInt(),
             fewestSatellitesUsed = inside.filter { it.kind == "GNSS" }.mapNotNull { it.fields.getOrNull(1)?.toIntOrNull() }.minOrNull(),
         )
     }
@@ -101,7 +125,7 @@ object DiagReport {
             appendLine("Distance ${RunFormat.km(track.distanceMeters)} · pace ${RunFormat.pace(track.averagePace(stop))}")
             appendLine("GPS fixes ${track.fixes} (dropped ${track.dropped}) · longest wait ${track.longestGapMillis / 1000} s")
             appendLine("Route stretches ${track.segments.size}")
-            lines.lastOrNull { it.kind == "STEP" }?.fields?.firstOrNull()?.let { appendLine("Steps $it") }
+            steps(lines).lastOrNull()?.let { appendLine("Steps ${it.second}") }
             appendLine()
 
             appendLine("== Readings ==")
@@ -109,7 +133,7 @@ object DiagReport {
             appendLine()
 
             appendLine("== GPS silences over ${SILENCE_MS / 1000} s while running ==")
-            val silences = silences(lines)
+            val silences = silences(lines, track.stoppedAt)
             if (silences.isEmpty()) appendLine("none")
             silences.forEach { s ->
                 append("${at(s.from)} → ${clock.format(Instant.ofEpochMilli(s.to))}  ${(s.to - s.from) / 1000} s")

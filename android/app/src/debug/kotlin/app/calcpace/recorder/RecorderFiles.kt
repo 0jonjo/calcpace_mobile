@@ -126,11 +126,14 @@ class RecorderFiles(context: Context) {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
             put(MediaStore.Downloads.MIME_TYPE, mime)
             put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Calcpace")
+            // Hidden from other apps (the run form's picker) until written.
+            put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val resolver = app.contentResolver
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
         try {
             resolver.openOutputStream(uri)?.use(write) ?: throw IOException("No stream")
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
         } catch (e: Exception) {
             // An empty file in Downloads is one the run form could pick.
             resolver.delete(uri, null, null)

@@ -3,6 +3,7 @@ package app.calcpace.recorder
 import android.location.Location
 import android.os.Build
 import android.os.SystemClock
+import android.util.Log
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -17,7 +18,8 @@ import java.util.Locale
  *   speed, speed accuracy, bearing, vertical accuracy, age in ms;
  * - `GNSS`: satellites visible, used in the fix, mean and max C/N0 (dB-Hz)
  *   of the used ones;
- * - `STEP`: steps since the run began (the phone's step counter);
+ * - `STEP`: the phone's step counter as it reads (counts since the phone
+ *   booted: [DiagReport] takes the differences);
  * - `PRES`: air pressure, hPa (only on phones with a barometer);
  * - `ACT`: what Google's activity recognition thinks the runner is doing,
  *   and how sure (0–100);
@@ -30,10 +32,12 @@ import java.util.Locale
  *
  * The [RunLog] stays what rebuilds the run; this file only describes it. It
  * is flushed per line and synced every few seconds: a kill loses at most the
- * last seconds of readings, never the run. Main thread only.
+ * last seconds of readings, never the run. A failing disk turns the log
+ * off, never throws: the recording calls in here. Main thread only.
  */
 object DiagLog {
     private const val SYNC_EVERY_MS = 5_000L
+    private const val TAG = "Recorder"
 
     private var out: FileOutputStream? = null
     private var lastSync = 0L
@@ -43,21 +47,30 @@ object DiagLog {
     fun open(file: File) {
         if (out != null) return
         val fresh = !file.exists() || file.length() == 0L
-        // A kill can leave the last line half written: start a line of our own.
-        val torn = !fresh && file.readBytes().last() != '\n'.code.toByte()
-        out = FileOutputStream(file, true).also { if (torn) it.write('\n'.code) }
+        try {
+            // A kill can leave the last line half written: start a line of our own.
+            val torn = !fresh && file.readBytes().last() != '\n'.code.toByte()
+            out = FileOutputStream(file, true).also { if (torn) it.write('\n'.code) }
+        } catch (e: Exception) {
+            fail(e)
+            return
+        }
         if (fresh) {
             write("NOTE", "log v1 · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
         }
     }
 
     fun close() {
-        out?.let {
-            it.flush()
-            it.fd.sync()
-            it.close()
-        }
+        val stream = out ?: return
         out = null
+        try {
+            stream.flush()
+            stream.fd.sync()
+        } catch (e: Exception) {
+            Log.w(TAG, "Readings not synced: $e")
+        } finally {
+            runCatching { stream.close() }
+        }
     }
 
     /** A no-op when no run is on, so callers need not ask. */
@@ -69,11 +82,21 @@ object DiagLog {
             fields.forEach { append(',').append(field(it)) }
             append('\n')
         }
-        stream.write(line.toByteArray())
-        if (now - lastSync >= SYNC_EVERY_MS) {
-            stream.fd.sync()
-            lastSync = now
+        try {
+            stream.write(line.toByteArray())
+            if (now - lastSync >= SYNC_EVERY_MS) {
+                stream.fd.sync()
+                lastSync = now
+            }
+        } catch (e: Exception) {
+            fail(e)
         }
+    }
+
+    private fun fail(e: Exception) {
+        Log.w(TAG, "Readings off for this run: $e")
+        out?.let { runCatching { it.close() } }
+        out = null
     }
 
     fun location(kind: String, location: Location) {

@@ -34,7 +34,9 @@ import com.google.android.gms.location.Priority
  * pauses included (what the runner does while paused is part of the study):
  * the fused provider, the GNSS status, the step counter, the barometer,
  * activity recognition and the screen, power and battery broadcasts. The
- * GPS itself is the service's, which hands each fix to [DiagLog].
+ * GPS itself is the service's, which hands each fix to [DiagLog]. While
+ * paused the fused provider only listens (passive), so the GPS chip rests as
+ * it does in the recorder: a test run's resume warms up like a real one.
  *
  * A source the phone lacks, or a permission refused, becomes a NOTE and the
  * rest go on: this must never get in the way of the recording.
@@ -46,9 +48,10 @@ class DiagProbe(private val context: Context) {
     private val fused = LocationServices.getFusedLocationProviderClient(context)
     private var started = false
 
-    private var firstSteps: Float? = null
     private var lastSteps: Float? = null
+    private var loggedSteps: Float? = null
     private var lastStepLog = 0L
+    private var running = true
     private var lastPressureLog = 0L
     private var lastGnssLog = 0L
     private var lastBattery: String? = null
@@ -56,28 +59,40 @@ class DiagProbe(private val context: Context) {
     fun start() {
         if (started) return
         started = true
-        startFused()
-        startGnss()
-        startSensors()
-        startActivityRecognition()
-        startBroadcasts()
-        battery(context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
-        val power = context.getSystemService(PowerManager::class.java)
-        DiagLog.write("SCREEN", if (power.isInteractive) "on" else "off")
-        if (power.isPowerSaveMode) DiagLog.write("POWER", "save_on")
+        // One source failing must not leave the others off.
+        listOf(
+            "fused" to ::startFused,
+            "gnss" to ::startGnss,
+            "sensors" to ::startSensors,
+            "activity recognition" to ::startActivityRecognition,
+            "broadcasts" to ::startBroadcasts,
+        ).forEach { (name, start) ->
+            runCatching(start).onFailure { DiagLog.write("NOTE", "$name failed to start: $it") }
+        }
+        runCatching {
+            battery(context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)))
+            val power = context.getSystemService(PowerManager::class.java)
+            DiagLog.write("SCREEN", if (power.isInteractive) "on" else "off")
+            if (power.isPowerSaveMode) DiagLog.write("POWER", "save_on")
+        }
     }
 
-    @SuppressLint("MissingPermission") // removeActivityUpdates: checked just below
+    /** Follows the recorder: the fused provider listens only, while paused. */
+    fun follow(running: Boolean) {
+        if (!started || running == this.running) return
+        this.running = running
+        runCatching { startFused() }.onFailure { DiagLog.write("NOTE", "fused failed to restart: $it") }
+    }
+
     fun stop() {
         if (!started) return
         started = false
-        lastSteps?.let { steps -> DiagLog.write("STEP", (steps - (firstSteps ?: steps)).toInt()) }
-        fused.removeLocationUpdates(fusedCallback)
-        locations.unregisterGnssStatusCallback(gnssCallback)
-        sensors.unregisterListener(sensorListener)
-        if (hasActivityPermission()) {
-            runCatching { ActivityRecognition.getClient(context).removeActivityUpdates(activityIntent()) }
-        }
+        main.removeCallbacks(flushSteps)
+        flushSteps.run()
+        runCatching { fused.removeLocationUpdates(fusedCallback) }
+        runCatching { locations.unregisterGnssStatusCallback(gnssCallback) }
+        runCatching { sensors.unregisterListener(sensorListener) }
+        forgetActivity(context)
         runCatching { context.unregisterReceiver(broadcasts) }
     }
 
@@ -90,7 +105,9 @@ class DiagProbe(private val context: Context) {
     @SuppressLint("MissingPermission")
     private fun startFused() {
         if (!hasLocation()) return
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).build()
+        val priority = if (running) Priority.PRIORITY_HIGH_ACCURACY else Priority.PRIORITY_PASSIVE
+        val request = LocationRequest.Builder(priority, 1000L).build()
+        // Same callback: a new request replaces the old one.
         fused.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper())
             .addOnFailureListener { DiagLog.write("NOTE", "fused unavailable: ${it.message}") }
     }
@@ -123,14 +140,13 @@ class DiagProbe(private val context: Context) {
         override fun onSensorChanged(event: SensorEvent) {
             val now = System.currentTimeMillis()
             when (event.sensor.type) {
+                // At most one line a second, the latest count never dropped:
+                // what comes in sooner is written when the second is up.
                 Sensor.TYPE_STEP_COUNTER -> {
-                    val steps = event.values[0]
-                    if (firstSteps == null) firstSteps = steps
-                    lastSteps = steps
-                    if (now - lastStepLog >= SENSOR_EVERY_MS) {
-                        lastStepLog = now
-                        DiagLog.write("STEP", (steps - firstSteps!!).toInt())
-                    }
+                    lastSteps = event.values[0]
+                    main.removeCallbacks(flushSteps)
+                    if (now - lastStepLog >= SENSOR_EVERY_MS) flushSteps.run()
+                    else main.postDelayed(flushSteps, SENSOR_EVERY_MS - (now - lastStepLog))
                 }
                 Sensor.TYPE_PRESSURE -> if (now - lastPressureLog >= SENSOR_EVERY_MS) {
                     lastPressureLog = now
@@ -140,6 +156,14 @@ class DiagProbe(private val context: Context) {
         }
 
         override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+    }
+
+    private val flushSteps = Runnable {
+        val steps = lastSteps ?: return@Runnable
+        if (steps == loggedSteps) return@Runnable
+        loggedSteps = steps
+        lastStepLog = System.currentTimeMillis()
+        DiagLog.write("STEP", steps.toLong())
     }
 
     private fun startSensors() {
@@ -164,11 +188,7 @@ class DiagProbe(private val context: Context) {
             .addOnFailureListener { DiagLog.write("NOTE", "activity recognition unavailable: ${it.message}") }
     }
 
-    // Mutable: Google Play services fills the result into it.
-    private fun activityIntent(): PendingIntent = PendingIntent.getBroadcast(
-        context, 0, Intent(context, DiagActivityReceiver::class.java),
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-    )
+    private fun activityIntent() = activityIntent(context)
 
     private val broadcasts = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -225,10 +245,28 @@ class DiagProbe(private val context: Context) {
     private fun granted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
-    private companion object {
-        const val SENSOR_EVERY_MS = 1_000L
-        const val GNSS_EVERY_MS = 2_000L
-        const val ACTIVITY_EVERY_MS = 5_000L
+    companion object {
+        private const val SENSOR_EVERY_MS = 1_000L
+        private const val GNSS_EVERY_MS = 2_000L
+        private const val ACTIVITY_EVERY_MS = 5_000L
+
+        // Mutable: Google Play services fills the result into it.
+        private fun activityIntent(context: Context): PendingIntent = PendingIntent.getBroadcast(
+            context, 0, Intent(context, DiagActivityReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
+
+        /**
+         * Activity recognition is registered with Play services and outlives
+         * the process: a run stopped from a fresh process (after a kill) must
+         * still cancel it, or it wakes the app every few seconds for good.
+         */
+        @SuppressLint("MissingPermission") // removeActivityUpdates: checked here
+        fun forgetActivity(context: Context) {
+            val allowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+            if (allowed) runCatching { ActivityRecognition.getClient(context).removeActivityUpdates(activityIntent(context)) }
+        }
     }
 }
 

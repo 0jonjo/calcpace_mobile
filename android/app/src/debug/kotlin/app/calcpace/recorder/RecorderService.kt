@@ -75,6 +75,7 @@ class RecorderService : Service(), LocationListener {
                 DiagLog.write("NOTE", "restart refused: no foreground service")
                 DiagLog.close()
             }
+            DiagProbe.forgetActivity(this)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -98,7 +99,12 @@ class RecorderService : Service(), LocationListener {
             ACTION_PAUSE -> if (track.isRunning) record(RunEvent.Pause(now))
             ACTION_RESUME -> if (track.isPaused) record(RunEvent.Resume(now))
             ACTION_STOP -> {
-                if (track.startedAt != null && !track.isStopped) record(RunEvent.Stop(now))
+                if (track.startedAt != null && !track.isStopped) {
+                    // A fresh process after a kill has the readings closed:
+                    // the stop belongs in them too.
+                    DiagLog.open(files.diag)
+                    record(RunEvent.Stop(now))
+                }
                 finish()
                 return START_NOT_STICKY
             }
@@ -142,7 +148,7 @@ class RecorderService : Service(), LocationListener {
 
     private fun stopDiag() {
         try {
-            probe?.stop()
+            probe?.stop() ?: DiagProbe.forgetActivity(this)
         } catch (e: Exception) {
             Log.w(TAG, "Readings did not stop cleanly: $e")
         }
@@ -158,6 +164,7 @@ class RecorderService : Service(), LocationListener {
         // Also a run resumed from the screen after the system killed the
         // service, which records no event of its own.
         if (track.startedAt != null && !track.isStopped) startDiag()
+        probe?.follow(track.isRunning)
         if (track.isRunning && hasLocation()) {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this, Looper.getMainLooper())
             if (wakeLock?.isHeld != true) {
@@ -174,7 +181,6 @@ class RecorderService : Service(), LocationListener {
 
     override fun onLocationChanged(location: Location) {
         if (!track.isRunning) return
-        DiagLog.location("GPS", location)
         record(
             RunEvent.Fix(
                 // The GPS's own time: fixes delivered in a batch keep their
@@ -186,6 +192,8 @@ class RecorderService : Service(), LocationListener {
                 accuracy = if (location.hasAccuracy()) location.accuracy else NO_ACCURACY,
             )
         )
+        // After the run has it: the readings never cost a fix.
+        DiagLog.location("GPS", location)
     }
 
     override fun onProviderDisabled(provider: String) {
