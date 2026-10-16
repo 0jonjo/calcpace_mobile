@@ -99,12 +99,7 @@ class RecorderService : Service(), LocationListener {
             ACTION_PAUSE -> if (track.isRunning) record(RunEvent.Pause(now))
             ACTION_RESUME -> if (track.isPaused) record(RunEvent.Resume(now))
             ACTION_STOP -> {
-                if (track.startedAt != null && !track.isStopped) {
-                    // A fresh process after a kill has the readings closed:
-                    // the stop belongs in them too.
-                    DiagLog.open(files.diag)
-                    record(RunEvent.Stop(now))
-                }
+                if (track.startedAt != null && !track.isStopped) record(RunEvent.Stop(now))
                 finish()
                 return START_NOT_STICKY
             }
@@ -124,6 +119,9 @@ class RecorderService : Service(), LocationListener {
 
     private fun record(event: RunEvent) {
         files.append(event)
+        // A fresh process after a kill has the readings closed: the runner's
+        // pause, resume or stop belongs in them too.
+        if (event !is RunEvent.Fix) DiagLog.open(files.diag)
         track.add(event)
         if (event is RunEvent.Start) startDiag()
         when (event) {

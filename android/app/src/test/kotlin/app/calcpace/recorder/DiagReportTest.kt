@@ -93,9 +93,21 @@ class DiagReportTest {
     @Test
     fun fixesDeliveredLateInABatchAreNoSilence() {
         val late = (1..20).map { second ->
-            at(25, "GPS", t0 + second * 1000L, "-5.8573418", "-35.2061699", "38.00", "4.00", "", "", "", "", "0")
+            at(25, "GPS", t0 + second * 1000L, "-5.8573418", "-35.2061699", "38.00", "4.00", "", "", "", "", (25 - second) * 1000)
         }
         val lines = DiagReport.parse((listOf(at(0, "RUN", "start")) + late + at(26, "RUN", "stop")).joinToString("\n"))
+
+        assertTrue(DiagReport.silences(lines).isEmpty())
+    }
+
+    // A phone clock 1 h ahead of the GPS's: the fixes' age, not their GPS
+    // time, places them against the start and stop.
+    @Test
+    fun aWrongPhoneClockMakesNoSilence() {
+        val skewed = (1..20).map { second ->
+            at(second, "GPS", t0 + second * 1000L - 3_600_000L, "-5.8573418", "-35.2061699", "38.00", "4.00", "", "", "", "", "300")
+        }
+        val lines = DiagReport.parse((listOf(at(0, "RUN", "start")) + skewed + at(21, "RUN", "stop")).joinToString("\n"))
 
         assertTrue(DiagReport.silences(lines).isEmpty())
     }

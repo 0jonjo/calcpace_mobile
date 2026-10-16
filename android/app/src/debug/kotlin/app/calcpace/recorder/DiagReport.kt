@@ -37,8 +37,8 @@ object DiagReport {
 
     /**
      * Gaps between GPS fixes longer than [SILENCE_MS] while the run was
-     * running, by the fixes' own times (as the [Track] counts them, and
-     * unmoved by fixes delivered late in a batch): a pause turns the GPS off
+     * running, by when each fix was taken (unmoved by fixes delivered late in
+     * a batch): a pause turns the GPS off
      * on purpose, so a gap that holds a pause is not one. The run's start and
      * stop are the edges; [stoppedAt] closes a run whose stop the readings
      * missed (stopped from a fresh process after a kill).
@@ -64,7 +64,7 @@ object DiagReport {
                 }
                 "SCREEN" -> screenOff = line.fields.firstOrNull() == "off"
                 "GPS" -> if (running) {
-                    val fixTime = line.fields.firstOrNull()?.toLongOrNull() ?: line.time
+                    val fixTime = takenAt(line)
                     close(fixTime)
                     lastFix = maxOf(lastFix ?: fixTime, fixTime)
                 }
@@ -73,6 +73,14 @@ object DiagReport {
         stoppedAt?.let(::close)
         return result
     }
+
+    /**
+     * When a GPS fix was taken, on the phone's clock like every other line:
+     * the line's time less the fix's age, which the phone measures on its
+     * monotonic clock. The GPS's own time would be off by however wrong the
+     * phone's clock is, against the start, pause and stop around it.
+     */
+    private fun takenAt(line: Line): Long = line.time - (line.fields.getOrNull(9)?.toLongOrNull()?.coerceAtLeast(0) ?: 0)
 
     /**
      * The step count since the first reading, at each STEP line. The phone's
