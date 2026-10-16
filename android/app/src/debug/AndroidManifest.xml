@@ -22,6 +22,10 @@
         tools:node="replace" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The recorder's test data (DiagProbe): the step counter and Google's
+         activity recognition. Debug only, like the recorder. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
     <!-- Android's direct "always run in the background?" dialog, which every
          running app shows. Play allows it only where background work is the
          app's core function: a declaration to make before this leaves debug. -->
@@ -65,7 +69,7 @@
             android:name="app.calcpace.recorder.RecorderActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true"
-            android:label="Record run"
+            android:label="Gravar (teste)"
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:taskAffinity="app.calcpace.recorder"
@@ -80,5 +84,10 @@
             android:name="app.calcpace.recorder.RecorderService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <!-- Activity recognition's answers for the test data (DiagProbe). -->
+        <receiver
+            android:name="app.calcpace.recorder.DiagActivityReceiver"
+            android:exported="false" />
     </application>
 </manifest>

@@ -175,6 +175,10 @@ dependencies {
     // compile against it, at the same version, so there is one OkHttp.
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
 
+    // The recorder's test data (DiagProbe): fused location and activity
+    // recognition, to compare with the GPS. Debug builds only.
+    debugImplementation("com.google.android.gms:play-services-location:21.3.0")
+
     testImplementation("junit:junit:4.13.2")
 }
 

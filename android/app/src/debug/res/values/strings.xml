@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Debug builds sit next to the Play app on the same phone: say which is which. -->
+    <string name="app_name" translatable="false">Calcpace (teste)</string>
+</resources>

@@ -38,11 +38,16 @@ import kotlinx.coroutines.flow.StateFlow
  * service started from the background (no screen, no "while in use"): then
  * it stops, and the recording screen offers to resume or finish the run the
  * next time it is opened.
+ *
+ * From Start to Stop it also turns on the [DiagProbe], which writes what the
+ * phone did (other location sources, satellites, steps, screen, power) to
+ * the [DiagLog], for test runs to be studied.
  */
 class RecorderService : Service(), LocationListener {
     private lateinit var files: RecorderFiles
     private var track = Track()
     private var wakeLock: PowerManager.WakeLock? = null
+    private var probe: DiagProbe? = null
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
@@ -64,7 +69,12 @@ class RecorderService : Service(), LocationListener {
             // Android refused a location service started without the app on
             // screen (a restart after a kill, screen off). Say so, or the run
             // goes on without GPS until the runner happens to look.
-            if (track.startedAt != null && !track.isStopped) notifyStopped()
+            if (track.startedAt != null && !track.isStopped) {
+                notifyStopped()
+                DiagLog.open(files.diag)
+                DiagLog.write("NOTE", "restart refused: no foreground service")
+                DiagLog.close()
+            }
             stopSelf()
             return START_NOT_STICKY
         }
@@ -97,6 +107,9 @@ class RecorderService : Service(), LocationListener {
                 if (track.isStopped) save()
                 stop()
                 return START_NOT_STICKY
+            } else {
+                startDiag()
+                DiagLog.write("NOTE", "service restarted, run resumed from the log")
             }
         }
         follow()
@@ -106,7 +119,35 @@ class RecorderService : Service(), LocationListener {
     private fun record(event: RunEvent) {
         files.append(event)
         track.add(event)
+        if (event is RunEvent.Start) startDiag()
+        when (event) {
+            is RunEvent.Start -> "start"
+            is RunEvent.Pause -> "pause"
+            is RunEvent.Resume -> "resume"
+            is RunEvent.Stop -> "stop"
+            is RunEvent.Fix -> null
+        }?.let { DiagLog.write("RUN", it) }
         publish()
+    }
+
+    /** Readings from Start to Stop, pauses included; never in the way of the run. */
+    private fun startDiag() {
+        try {
+            DiagLog.open(files.diag)
+            (probe ?: DiagProbe(this).also { probe = it }).start()
+        } catch (e: Exception) {
+            Log.w(TAG, "No readings for this run: $e")
+        }
+    }
+
+    private fun stopDiag() {
+        try {
+            probe?.stop()
+        } catch (e: Exception) {
+            Log.w(TAG, "Readings did not stop cleanly: $e")
+        }
+        probe = null
+        DiagLog.close()
     }
 
     /** GPS on while running, off while paused; the wake lock follows. */
@@ -114,6 +155,9 @@ class RecorderService : Service(), LocationListener {
     private fun follow() {
         val manager = getSystemService(LocationManager::class.java)
         manager.removeUpdates(this)
+        // Also a run resumed from the screen after the system killed the
+        // service, which records no event of its own.
+        if (track.startedAt != null && !track.isStopped) startDiag()
         if (track.isRunning && hasLocation()) {
             manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this, Looper.getMainLooper())
             if (wakeLock?.isHeld != true) {
@@ -130,6 +174,7 @@ class RecorderService : Service(), LocationListener {
 
     override fun onLocationChanged(location: Location) {
         if (!track.isRunning) return
+        DiagLog.location("GPS", location)
         record(
             RunEvent.Fix(
                 // The GPS's own time: fixes delivered in a batch keep their
@@ -145,12 +190,17 @@ class RecorderService : Service(), LocationListener {
 
     override fun onProviderDisabled(provider: String) {
         Log.w(TAG, "GPS turned off during a run")
+        DiagLog.write("NOTE", "location turned off on the phone")
     }
 
-    override fun onProviderEnabled(provider: String) {}
+    override fun onProviderEnabled(provider: String) {
+        DiagLog.write("NOTE", "location turned on on the phone")
+    }
 
     private fun finish() {
         getSystemService(LocationManager::class.java).removeUpdates(this)
+        // Closed before the save moves the readings into runs/.
+        stopDiag()
         // A second Stop finds nothing to save: keep the "saved" screen.
         if (track.startedAt != null) save()
         stop()
@@ -195,6 +245,7 @@ class RecorderService : Service(), LocationListener {
     }
 
     private fun stop() {
+        stopDiag()
         handler.removeCallbacks(tick)
         releaseWakeLock()
         files.close()
@@ -204,6 +255,7 @@ class RecorderService : Service(), LocationListener {
 
     override fun onDestroy() {
         getSystemService(LocationManager::class.java).removeUpdates(this)
+        stopDiag()
         handler.removeCallbacks(tick)
         releaseWakeLock()
         files.close()

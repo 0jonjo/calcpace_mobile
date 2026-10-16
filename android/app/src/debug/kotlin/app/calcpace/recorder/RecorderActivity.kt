@@ -34,7 +34,9 @@ import kotlinx.coroutines.launch
  * run"): time, distance and average pace, Start / Pause / Stop, and what the
  * GPS did, so a test run says whether the phone kept the recorder alive.
  * The run is saved as GPX in Downloads/Calcpace; the site's run form takes
- * it from there ("Open Calcpace").
+ * it from there ("Open Calcpace"). Next to it goes a zip with everything the
+ * phone did during the run ([DiagLog], summary.txt), shared from here to be
+ * studied.
  */
 class RecorderActivity : ComponentActivity() {
     private lateinit var status: TextView
@@ -45,6 +47,7 @@ class RecorderActivity : ComponentActivity() {
     private lateinit var primary: Button
     private lateinit var stop: Button
     private lateinit var share: Button
+    private lateinit var shareStudy: Button
     private lateinit var openSite: Button
     private lateinit var battery: Button
 
@@ -67,6 +70,7 @@ class RecorderActivity : ComponentActivity() {
         RecorderService.send(this, RecorderService.ACTION_START)
     }
     private var askedBattery = false
+    private var askedActivity = false
 
     /**
      * What every running app does: before the first run, Android's own
@@ -102,10 +106,12 @@ class RecorderActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         ticker.post(tick)
+        DiagLog.write("APP", "fg")
     }
 
     override fun onStop() {
         ticker.removeCallbacks(tick)
+        DiagLog.write("APP", "bg")
         super.onStop()
     }
 
@@ -123,6 +129,7 @@ class RecorderActivity : ComponentActivity() {
         primary = Button(this).apply { textSize = 22f; setOnClickListener { onPrimary() } }
         stop = Button(this).apply { text = "Stop and save"; setOnClickListener { confirmStop() } }
         share = Button(this).apply { text = "Share GPX"; setOnClickListener { shareLast() } }
+        shareStudy = Button(this).apply { text = "Share test data (zip)"; setOnClickListener { shareStudy() } }
         openSite = Button(this).apply {
             text = "Open Calcpace (upload on the run form)"
             setOnClickListener { startActivity(Intent(this@RecorderActivity, MainActivity::class.java)) }
@@ -134,7 +141,7 @@ class RecorderActivity : ComponentActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 48, 48, 48)
-            listOf(status, clock, distance, pace, primary, stop, details, share, openSite, battery).forEach(::addView)
+            listOf(status, clock, distance, pace, primary, stop, details, share, shareStudy, openSite, battery).forEach(::addView)
             ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
                 val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
                 view.setPadding(48, 48 + bars.top, 48, 48 + bars.bottom)
@@ -153,8 +160,13 @@ class RecorderActivity : ComponentActivity() {
                 RecorderService.send(this, RecorderService.ACTION_START)
             live?.isRunning == true -> RecorderService.send(this, RecorderService.ACTION_PAUSE)
             live?.isPaused == true -> RecorderService.send(this, RecorderService.ACTION_RESUME)
-            hasLocation() -> beginRun()
-            else -> askPermissions.launch(permissions())
+            // Physical activity is asked once a visit, even with location
+            // already allowed (a phone set up before the test data existed).
+            hasLocation() && (hasActivityPermission() || askedActivity) -> beginRun()
+            else -> {
+                askedActivity = true
+                askPermissions.launch(permissions())
+            }
         }
     }
 
@@ -185,7 +197,8 @@ class RecorderActivity : ComponentActivity() {
 
         status.text = when {
             finished != null && finished.name == null -> "Could not save the run. It is kept: tap Start to try again."
-            finished?.download != null -> "Saved: Downloads/Calcpace/${finished.name}"
+            finished?.download != null -> "Saved: Downloads/Calcpace/${finished.name}" +
+                (if (finished.bundle != null) "\nTest data: ${finished.name?.removeSuffix(".gpx")}.zip" else "\nNo test data zip")
             finished != null -> "Saved in the app only (no copy in Downloads): ${finished.name}"
             orphan -> "The recorder was stopped by the phone. Resume or stop and save."
             track?.isRunning == true -> "Recording · GPS ±${track.lastAccuracy?.toInt() ?: "–"} m"
@@ -200,12 +213,15 @@ class RecorderActivity : ComponentActivity() {
         }
         stop.isEnabled = finished == null && track != null && !track.isStopped
         share.isEnabled = finished?.download != null
+        shareStudy.isEnabled = finished?.bundle != null
 
         details.text = buildString {
+            // The saved run's numbers stay on screen until the next Start.
             if (track != null) {
                 append("Fixes: ${track.fixes} (dropped ${track.dropped})\n")
                 append("Longest wait for GPS: ${track.longestGapMillis / 1000} s\n")
             }
+            if (!hasActivityPermission()) append("Physical activity: not allowed (no steps in the test data)\n")
             append("Battery optimization: ")
             if (ignoringBatteryOptimizations()) {
                 append("off for Calcpace (good)")
@@ -215,6 +231,19 @@ class RecorderActivity : ComponentActivity() {
             append("\nSamsung: Configurações → Apps → Calcpace → Bateria → Irrestrito")
         }
     }
+
+    private fun shareStudy() {
+        val uri = RecorderService.snapshots.value?.finished?.bundle ?: return
+        val send = Intent(Intent.ACTION_SEND)
+            .setType("application/zip")
+            .putExtra(Intent.EXTRA_STREAM, uri)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(send, "Share the test data"))
+    }
+
+    private fun hasActivityPermission() =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
 
     private fun shareLast() {
         val uri = RecorderService.snapshots.value?.finished?.download ?: return
@@ -232,6 +261,9 @@ class RecorderActivity : ComponentActivity() {
         add(Manifest.permission.ACCESS_FINE_LOCATION)
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
+        // Steps and activity recognition, for the test data only: refusing it
+        // still records the run.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Manifest.permission.ACTIVITY_RECOGNITION)
     }.toTypedArray()
 
     private fun ignoringBatteryOptimizations() =
