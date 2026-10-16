@@ -2,9 +2,11 @@ package app.calcpace.recorder
 
 import android.Manifest
 import android.app.AlertDialog
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -55,8 +57,35 @@ class RecorderActivity : ComponentActivity() {
     }
 
     private val askPermissions = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        if (hasLocation()) RecorderService.send(this, RecorderService.ACTION_START)
+        if (hasLocation()) beginRun()
         else status.text = "Location is off for Calcpace: the recorder needs it to run."
+    }
+
+    // Whatever the answer, the run starts: the screen keeps saying whether
+    // the phone may stop it.
+    private val askBattery = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        RecorderService.send(this, RecorderService.ACTION_START)
+    }
+    private var askedBattery = false
+
+    /**
+     * What every running app does: before the first run, Android's own
+     * "let the app always run in the background?" dialog, once per visit to
+     * this screen. Samsung also has its own sleeping-apps lists, which only
+     * the app's "Unrestricted" battery setting covers; the screen says where.
+     */
+    private fun beginRun() {
+        if (!ignoringBatteryOptimizations() && !askedBattery) {
+            askedBattery = true
+            val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+            try {
+                askBattery.launch(ask)
+                return
+            } catch (_: ActivityNotFoundException) {
+                // No such screen on this phone: start anyway.
+            }
+        }
+        RecorderService.send(this, RecorderService.ACTION_START)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,7 +153,7 @@ class RecorderActivity : ComponentActivity() {
                 RecorderService.send(this, RecorderService.ACTION_START)
             live?.isRunning == true -> RecorderService.send(this, RecorderService.ACTION_PAUSE)
             live?.isPaused == true -> RecorderService.send(this, RecorderService.ACTION_RESUME)
-            hasLocation() -> RecorderService.send(this, RecorderService.ACTION_START)
+            hasLocation() -> beginRun()
             else -> askPermissions.launch(permissions())
         }
     }
@@ -178,7 +207,12 @@ class RecorderActivity : ComponentActivity() {
                 append("Longest wait for GPS: ${track.longestGapMillis / 1000} s\n")
             }
             append("Battery optimization: ")
-            append(if (ignoringBatteryOptimizations()) "off for Calcpace (good)" else "ON — the phone may stop the recorder")
+            if (ignoringBatteryOptimizations()) {
+                append("off for Calcpace (good)")
+            } else {
+                append("ON — the phone may stop the recorder")
+            }
+            append("\nSamsung: Configurações → Apps → Calcpace → Bateria → Irrestrito")
         }
     }
 
