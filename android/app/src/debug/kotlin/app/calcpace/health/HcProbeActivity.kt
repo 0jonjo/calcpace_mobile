@@ -177,8 +177,9 @@ class HcProbeActivity : ComponentActivity() {
                 report.appendLine("  $name: not granted")
                 return@forEach
             }
+            var records: List<Record> = emptyList()
             val line = try {
-                val records = readAll(client, type, window)
+                records = readAll(client, type, window)
                 if (records.isEmpty()) "none"
                 else records.groupBy { it.metadata.dataOrigin.packageName }.entries.joinToString(" · ") { (origin, list) ->
                     val own = if (origin == session.metadata.dataOrigin.packageName) "" else " (other app)"
@@ -190,6 +191,7 @@ class HcProbeActivity : ComponentActivity() {
                 "failed: ${e.javaClass.simpleName}: ${e.message}"
             }
             report.appendLine("  $name: $line")
+            if (type == StepsRecord::class) steps(records).forEach { report.appendLine(it) }
         }
         render(id)
     }
@@ -217,6 +219,21 @@ class HcProbeActivity : ComponentActivity() {
             }
         }
         return if (count > 0) ", $count samples" else ""
+    }
+
+    // One line per steps record, in time order, with its pace and the gap
+    // since the one before: Samsung Health writes no speed and no segments,
+    // so a stretch of few or no steps is the only trace of a pause it leaves.
+    private fun steps(records: List<Record>): List<String> {
+        val sorted = records.filterIsInstance<StepsRecord>().sortedBy { it.startTime }
+        return sorted.mapIndexed { i, record ->
+            val seconds = Duration.between(record.startTime, record.endTime).seconds
+            val rate = if (seconds > 0) "%.0f/min".format(record.count * 60.0 / seconds) else "-"
+            val gap = sorted.getOrNull(i - 1)?.let { Duration.between(it.endTime, record.startTime).seconds }
+            "    ${CLOCK.format(record.startTime)}–${CLOCK.format(record.endTime)} ${seconds}s ${record.count} steps $rate" +
+                (if (gap != null && gap != 0L) " (gap ${gap}s)" else "") +
+                " ${record.metadata.dataOrigin.packageName}"
+        }
     }
 
     private fun total(records: List<Record>): String = when (records.first()) {
@@ -277,6 +294,7 @@ class HcProbeActivity : ComponentActivity() {
         const val TAG = "HcProbe"
         val DAY: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM").withZone(ZoneId.systemDefault())
         val TIME: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM HH:mm").withZone(ZoneId.systemDefault())
+        val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
 
         val SERIES: List<Pair<String, KClass<out Record>>> = listOf(
             "distance" to DistanceRecord::class,
