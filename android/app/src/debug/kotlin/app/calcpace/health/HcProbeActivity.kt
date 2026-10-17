@@ -224,12 +224,17 @@ class HcProbeActivity : ComponentActivity() {
     // One line per steps record, in time order, with its pace and the gap
     // since the one before: Samsung Health writes no speed and no segments,
     // so a stretch of few or no steps is the only trace of a pause it leaves.
+    // App by app: another app's records overlap these, and a gap measured
+    // across them would show a pause that never was.
     private fun steps(records: List<Record>): List<String> {
-        val sorted = records.filterIsInstance<StepsRecord>().sortedBy { it.startTime }
+        val sorted = records.filterIsInstance<StepsRecord>()
+            .sortedWith(compareBy({ it.metadata.dataOrigin.packageName }, { it.startTime }))
         return sorted.mapIndexed { i, record ->
             val seconds = Duration.between(record.startTime, record.endTime).seconds
             val rate = if (seconds > 0) "%.0f/min".format(record.count * 60.0 / seconds) else "-"
-            val gap = sorted.getOrNull(i - 1)?.let { Duration.between(it.endTime, record.startTime).seconds }
+            val gap = sorted.getOrNull(i - 1)
+                ?.takeIf { it.metadata.dataOrigin.packageName == record.metadata.dataOrigin.packageName }
+                ?.let { Duration.between(it.endTime, record.startTime).seconds }
             "    ${CLOCK.format(record.startTime)}–${CLOCK.format(record.endTime)} ${seconds}s ${record.count} steps $rate" +
                 (if (gap != null && gap != 0L) " (gap ${gap}s)" else "") +
                 " ${record.metadata.dataOrigin.packageName}"
