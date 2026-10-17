@@ -2,15 +2,50 @@
 <!-- Debug builds may point at a local Rails server over plain HTTP, and
      accept that server's links the way release accepts calcpace.app's:
      the same paths, so a sign-in against it behaves as in release. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- HcSeedActivity writes made-up runs to Health Connect for testing
          the import on an emulator. Debug builds only: a release build never
          asks to write anything. -->
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+
+    <!-- The run recorder (G0, recorder/): GPS in a foreground service of
+         type location. Debug builds only until it goes to the testers: a
+         release build asks for no location and declares no foreground
+         service to Play. The main manifest removes FOREGROUND_SERVICE (it
+         came from WorkManager); this puts it back for debug. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="replace" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- The recorder's test data (DiagProbe): the step counter and Google's
+         activity recognition. Debug only, like the recorder. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION" />
+    <!-- Android's direct "always run in the background?" dialog, which every
+         running app shows. Play allows it only where background work is the
+         app's core function: a declaration to make before this leaves debug. -->
+    <uses-permission
+        android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+        tools:ignore="BatteryLife" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_ELEVATION_GAINED" />
+
+    <!-- HcProbeActivity lists what each session holds beyond the import's
+         totals (laps, route, series). Debug builds only: release asks for
+         the five reads the Play Console declares and nothing more. -->
+    <uses-permission android:name="android.permission.health.READ_SPEED" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_POWER" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTES" />
 
     <application android:usesCleartextTraffic="true">
         <activity
@@ -38,5 +73,48 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Its own launcher icon, so the recorder is one tap away on a run.
+             Portrait and not recreated on rotation: a pocket turns the phone. -->
+        <activity
+            android:name="app.calcpace.recorder.RecorderActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
+            android:label="Gravar (teste)"
+            android:launchMode="singleTop"
+            android:screenOrientation="portrait"
+            android:taskAffinity="app.calcpace.recorder"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Its own launcher icon, so it runs on a phone without adb. Not
+             recreated on rotation: that would read everything again and
+             drop the answer of an open route dialog. -->
+        <activity
+            android:name="app.calcpace.health.HcProbeActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
+            android:label="HC Probe"
+            android:taskAffinity="app.calcpace.probe"
+            android:theme="@style/Theme.Calcpace">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name="app.calcpace.recorder.RecorderService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Activity recognition's answers for the test data (DiagProbe). -->
+        <receiver
+            android:name="app.calcpace.recorder.DiagActivityReceiver"
+            android:exported="false" />
     </application>
 </manifest>

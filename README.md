@@ -43,6 +43,8 @@ cd android
 
 Debug builds install as `app.calcpace.twa.debug`, next to the Play version.
 
+Debug builds also carry the run recorder (G0, [`recorder/`](android/app/src/debug/kotlin/app/calcpace/recorder)), with its own launcher icon, "Record run": GPS in a foreground service of type location, the run logged line by line (`files/recorder/current.log`) so a killed process resumes from it, and the finished run saved as GPX in Downloads/Calcpace for the site's run form. The location and foreground-service permissions are in the debug manifest only; a release build declares neither. The plan and its pass mark (no run lost, distance within 2%) are in `calcpace_docs/plans/calcpace_gravador_plan.md`.
+
 Push notifications need Firebase options, read at build time from a `google-services.json` that never enters the repo (it is public): `~/.config/calcpace/google-services.json` by default, or `-Pcalcpace.googleServices=/path/to/google-services.json` (a relative path resolves against `android/`). Without the file the app builds and runs with push off (the bridge reports `unavailable`); that is how CI builds it. A release build fails without it, and an unreadable file fails any build. The file only knows the real package, so a default debug build (`app.calcpace.twa.debug`) also reports `unavailable`: test push on a debug build with `-Pcalcpace.debugIdSuffix=`. Release signing reads a properties file that stays out of the repo (`~/.calcpace/signing.properties`, or a path in `CALCPACE_SIGNING`) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`.
 
 ### Health Connect
@@ -72,6 +74,8 @@ adb logcat -s HcSeed HcSync                                         # the seeded
 ```
 
 The first run asks for the write permissions; run the command again after allowing them. Seeded sessions come from the app's own package (unknown to the site, so no app name) on a made-up "Calcpace Seed Watch": the site shows "via Health Connect · Calcpace Seed Watch".
+
+Debug builds also install a second launcher icon, **HC Probe**, that lists what Health Connect holds for each session of the last 30 days beyond the totals the import reads: laps, segments, the route (through Health Connect's per-session dialog) and the heart rate, speed, cadence, power, steps, calories and VO2max records, with the app each came from. It saves and sends nothing; "Share report" hands the text to any app. For it, debug builds declare seven more read permissions (`READ_SPEED`, `READ_STEPS`, `READ_POWER`, `READ_ACTIVE_CALORIES_BURNED`, `READ_TOTAL_CALORIES_BURNED`, `READ_VO2_MAX`, `READ_EXERCISE_ROUTES`); release declares none of them.
 
 ## Roadmap
 
